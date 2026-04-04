@@ -1,0 +1,65 @@
+apiVersion: skaffold/v4beta11
+kind: Config
+metadata:
+  name: agent-platform
+
+build:
+  artifacts:
+    - image: agent-platform-gateway
+      context: services/gateway
+      docker:
+        dockerfile: Dockerfile
+    - image: agent-platform-agent-engine
+      context: services/agent-engine
+      docker:
+        dockerfile: Dockerfile
+    - image: agent-platform-document-service
+      context: services/document-service
+      docker:
+        dockerfile: Dockerfile
+    - image: agent-platform-cache-service
+      context: services/cache-service
+      docker:
+        dockerfile: Dockerfile
+    - image: agent-platform-cost-tracker
+      context: services/cost-tracker
+      docker:
+        dockerfile: Dockerfile
+    - image: agent-platform-frontend
+      context: frontend
+      docker:
+        dockerfile: Dockerfile
+  local:
+    push: false
+    useBuildkit: true
+
+deploy:
+  kustomize:
+    paths:
+      - infra/k8s/overlays/dev
+
+portForward:
+  - resourceType: service
+    resourceName: gateway
+    port: 8000
+    localPort: 8000
+  - resourceType: service
+    resourceName: frontend
+    port: 3000
+    localPort: 3000
+  - resourceType: service
+    resourceName: grafana
+    port: 3000
+    localPort: 3001
+
+profiles:
+  - name: staging
+    deploy:
+      kustomize:
+        paths:
+          - infra/k8s/overlays/staging
+  - name: prod
+    deploy:
+      kustomize:
+        paths:
+          - infra/k8s/overlays/prod

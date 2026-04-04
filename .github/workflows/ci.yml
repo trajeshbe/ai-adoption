@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - name: Lint Python
+        run: |
+          uv run ruff check services/ libs/py-common/
+          uv run ruff format --check services/ libs/py-common/
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Lint TypeScript
+        run: |
+          cd frontend && npm install -g pnpm && pnpm install --frozen-lockfile
+          pnpm lint
+
+  type-check:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv run mypy services/ libs/py-common/ --strict --ignore-missing-imports
+
+  test-python:
+    name: Python Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: agent_platform
+          POSTGRES_USER: agent_platform
+          POSTGRES_PASSWORD: agent_platform
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U agent_platform"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis/redis-stack:7.2.0-v10
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - name: Run unit tests
+        run: uv run pytest services/*/tests/unit/ libs/py-common/tests/ -v --tb=short
+      - name: Run integration tests
+        run: uv run pytest services/*/tests/integration/ -v --tb=short
+        env:
+          DATABASE_URL: postgresql://agent_platform:agent_platform@localhost:5432/agent_platform
+          REDIS_URL: redis://localhost:6379/0
+
+  test-frontend:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install and test
+        run: |
+          cd frontend
+          npm install -g pnpm
+          pnpm install --frozen-lockfile
+          pnpm test
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: 1

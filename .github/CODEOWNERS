@@ -1,0 +1,14 @@
+# Default owners for everything
+* @platform-team
+
+# Service-specific ownership
+services/gateway/          @api-team
+services/agent-engine/     @ml-team
+services/document-service/ @ml-team
+services/cache-service/    @platform-team
+services/cost-tracker/     @platform-team
+frontend/                  @frontend-team
+infra/                     @sre-team
+tests/chaos/               @sre-team
+tests/security/            @security-team
+docs/                      @platform-team
