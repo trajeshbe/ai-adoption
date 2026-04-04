@@ -1,0 +1,10 @@
+[project]
+name = "agent-platform-agent-engine"
+version = "0.1.0"
+description = "Agent Platform agent-engine service (Phase 3-4)"
+requires-python = ">=3.11"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
