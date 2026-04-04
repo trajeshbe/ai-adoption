@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-import pytest
 
 from cache_service.models import CacheEntry, CacheHit, CacheStats
 

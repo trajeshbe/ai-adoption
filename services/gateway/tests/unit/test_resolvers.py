@@ -1,6 +1,5 @@
 """Tests for GraphQL resolvers."""
 
-import json
 
 
 def _graphql(client, query: str, variables: dict | None = None) -> dict:

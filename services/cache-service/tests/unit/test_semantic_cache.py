@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
-import numpy as np
 import pytest
 from redis.exceptions import ResponseError
 
-from cache_service.embeddings import EMBEDDING_DIM, EmbeddingClient
+from cache_service.embeddings import EMBEDDING_DIM
 from cache_service.models import CacheHit, CacheStats
 from cache_service.semantic_cache import SemanticCache
 

@@ -1,26 +1,34 @@
 # ============================================================================
-# DevContainer + Local Infrastructure
-# Derived from: github.com/trajeshbe/merit-aiml docker-compose.yml (kiaa-gpu)
+# AI Adoption Platform -- DevContainer + Local Infrastructure
+# Derived from: github.com/trajeshbe/merit-aiml docker-compose (kiaa-gpu)
 #
-# Services:
-#   - devcontainer: Development environment with all tools
-#   - postgres:     PostgreSQL 16 + pgvector extension
-#   - redis:        Redis 7.2 + RediSearch (VSS semantic cache)
-#   - minio:        S3-compatible object storage
-#   - ollama:       Local LLM inference (optional GPU)
+# ISOLATION: All containers use "aiadopt-" prefix, unique host ports (20xxx),
+# own network (aiadopt-net), and prefixed volumes. Zero interference with
+# existing rag-* or customer_support_assistant_* containers.
+#
+# Port Map (host -> container):
+#   Postgres:  20432 -> 5432
+#   Redis:     20379 -> 6379
+#   Redis UI:  20380 -> 8001
+#   MinIO API: 20900 -> 9000
+#   MinIO UI:  20901 -> 9001
+#   Ollama:    20434 -> 11434
+#   Gateway:   20800 -> 8000
+#   Frontend:  20300 -> 3000
 # ============================================================================
 
 services:
   devcontainer:
+    container_name: aiadopt-devcontainer
     build:
       context: .
       dockerfile: Dockerfile
     volumes:
       - ..:/workspace:cached
-      - devcontainer-extensions:/home/vscode/.vscode-server/extensions
+      - aiadopt-vscode-extensions:/home/vscode/.vscode-server/extensions
     command: sleep infinity
     networks:
-      - agent-platform
+      - aiadopt-net
     depends_on:
       postgres:
         condition: service_healthy
@@ -29,8 +37,9 @@ services:
       minio:
         condition: service_started
 
-  # ── PostgreSQL + pgvector (from merit-aiml) ──────────────────────────
+  # ── PostgreSQL 16 + pgvector (same image as merit-aiml) ──────────────
   postgres:
+    container_name: aiadopt-postgres
     image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
@@ -38,36 +47,38 @@ services:
       POSTGRES_USER: agent_platform
       POSTGRES_PASSWORD: agent_platform
     ports:
-      - "5432:5432"
+      - "20432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - aiadopt-postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U agent_platform"]
       interval: 5s
       timeout: 5s
       retries: 5
     networks:
-      - agent-platform
+      - aiadopt-net
 
-  # ── Redis 7.2 + RediSearch for VSS (from merit-aiml) ────────────────
+  # ── Redis 7.2 + RediSearch for VSS (same image as merit-aiml) ───────
   redis:
+    container_name: aiadopt-redis
     image: redis/redis-stack:7.2.0-v10
     restart: unless-stopped
     ports:
-      - "6379:6379"
-      - "8001:8001"
+      - "20379:6379"
+      - "20380:8001"
     volumes:
-      - redis_data:/data
+      - aiadopt-redis-data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
     networks:
-      - agent-platform
+      - aiadopt-net
 
-  # ── MinIO S3-compatible object store (from merit-aiml) ───────────────
+  # ── MinIO S3-compatible object store (same image as merit-aiml) ──────
   minio:
+    container_name: aiadopt-minio
     image: minio/minio:latest
     restart: unless-stopped
     command: server /data --console-address ":9001"
@@ -75,22 +86,23 @@ services:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "20900:9000"
+      - "20901:9001"
     volumes:
-      - minio_data:/data
+      - aiadopt-minio-data:/data
     networks:
-      - agent-platform
+      - aiadopt-net
 
-  # ── Ollama LLM inference (optional, GPU-aware) ──────────────────────
+  # ── Ollama LLM inference (same image as merit-aiml) ─────────────────
   # Uncomment deploy section if you have an NVIDIA GPU
   ollama:
+    container_name: aiadopt-ollama
     image: ollama/ollama:0.11.0
     restart: unless-stopped
     ports:
-      - "11434:11434"
+      - "20434:11434"
     volumes:
-      - ollama_models:/root/.ollama
+      - aiadopt-ollama-models:/root/.ollama
     # deploy:
     #   resources:
     #     reservations:
@@ -99,15 +111,16 @@ services:
     #           count: 1
     #           capabilities: [gpu]
     networks:
-      - agent-platform
+      - aiadopt-net
 
 volumes:
-  devcontainer-extensions:
-  postgres_data:
-  redis_data:
-  minio_data:
-  ollama_models:
+  aiadopt-vscode-extensions:
+  aiadopt-postgres-data:
+  aiadopt-redis-data:
+  aiadopt-minio-data:
+  aiadopt-ollama-models:
 
 networks:
-  agent-platform:
+  aiadopt-net:
+    name: aiadopt-net
     driver: bridge

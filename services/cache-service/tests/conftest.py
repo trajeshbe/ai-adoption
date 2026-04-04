@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from cache_service.embeddings import EMBEDDING_DIM, EmbeddingClient
+from cache_service.embeddings import EmbeddingClient
 from cache_service.semantic_cache import SemanticCache
 
 

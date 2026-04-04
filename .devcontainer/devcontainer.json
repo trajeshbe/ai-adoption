@@ -44,14 +44,13 @@
   },
 
   "forwardPorts": [
-    8000,
-    3000,
-    5432,
-    6379,
-    9000,
-    9001,
-    4317,
-    3001
+    20800,
+    20300,
+    20432,
+    20379,
+    20900,
+    20901,
+    20434
   ],
 
   "postCreateCommand": "bash .devcontainer/post-create.sh",
@@ -62,6 +61,7 @@
     "MINIO_ENDPOINT": "minio:9000",
     "MINIO_ACCESS_KEY": "minioadmin",
     "MINIO_SECRET_KEY": "minioadmin",
+    "LLM_PRIMARY_URL": "http://ollama:11434/v1",
     "OTEL_EXPORTER_OTLP_ENDPOINT": "http://otel-collector:4317",
     "ENVIRONMENT": "development"
   }

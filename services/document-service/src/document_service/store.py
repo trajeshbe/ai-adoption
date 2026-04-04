@@ -5,7 +5,6 @@ from __future__ import annotations
 import io
 
 from minio import Minio
-from minio.error import S3Error
 
 from agent_platform_common.config import Settings
 from agent_platform_common.logging import get_logger

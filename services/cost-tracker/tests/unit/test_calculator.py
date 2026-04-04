@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
 
 from cost_tracker.calculator import CostCalculator, _period_to_hours
-from cost_tracker.collector import OpenCostCollector
 from cost_tracker.models import CostSummary, InferenceCost, PodCost
 
 

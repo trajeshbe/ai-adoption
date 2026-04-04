@@ -7,7 +7,6 @@ service via httpx in Phase 4.
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-import strawberry
 
 from gateway.schema import Agent, AgentType, CreateAgentInput
 
