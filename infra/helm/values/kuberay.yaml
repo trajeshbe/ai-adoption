@@ -1,0 +1,32 @@
+# KubeRay Operator
+# Chart: helm repo add kuberay https://ray-project.github.io/kuberay-helm/
+# Chart: kuberay/kuberay-operator
+---
+operator:
+  image:
+    repository: kuberay/operator
+    tag: v1.1.1
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+crds:
+  enabled: true
+  keep: true
+
+batchScheduler:
+  enabled: false
+
+serviceAccount:
+  create: true
+
+rbac:
+  create: true
+
+logging:
+  level: info

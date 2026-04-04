@@ -1,0 +1,192 @@
+# Grafana Stack - Grafana + Tempo + Loki + Mimir (monolithic dev mode)
+# Charts:
+#   grafana/grafana
+#   grafana/tempo
+#   grafana/loki
+#   grafana/mimir-distributed
+---
+
+# --- Grafana ---
+grafana:
+  image:
+    tag: 11.3.0
+
+  adminUser: admin
+  adminPassword: "$(GRAFANA_ADMIN_PASSWORD)"
+
+  service:
+    type: ClusterIP
+    port: 3000
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  persistence:
+    enabled: true
+    size: 2Gi
+
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: Tempo
+          type: tempo
+          access: proxy
+          url: http://tempo:3100
+          isDefault: false
+          jsonData:
+            tracesToLogsV2:
+              datasourceUid: loki
+              filterByTraceID: true
+            nodeGraph:
+              enabled: true
+            serviceMap:
+              datasourceUid: mimir
+
+        - name: Loki
+          type: loki
+          uid: loki
+          access: proxy
+          url: http://loki:3100
+          isDefault: false
+          jsonData:
+            derivedFields:
+              - datasourceUid: tempo
+                matcherRegex: "trace_id=(\\w+)"
+                name: TraceID
+                url: "$${__value.raw}"
+
+        - name: Mimir
+          type: prometheus
+          uid: mimir
+          access: proxy
+          url: http://mimir:9009/prometheus
+          isDefault: true
+          jsonData:
+            timeInterval: 15s
+
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: default
+          orgId: 1
+          folder: ""
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/default
+
+  dashboards:
+    default:
+      agent-platform-overview:
+        gnetId: 15760
+        revision: 1
+        datasource: Mimir
+
+# --- Tempo (traces) ---
+tempo:
+  tempo:
+    storage:
+      trace:
+        backend: local
+        local:
+          path: /var/tempo/traces
+
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  persistence:
+    enabled: true
+    size: 5Gi
+
+# --- Loki (logs) ---
+loki:
+  deploymentMode: SingleBinary
+
+  loki:
+    auth_enabled: false
+    commonConfig:
+      replication_factor: 1
+    storage:
+      type: filesystem
+    schemaConfig:
+      configs:
+        - from: "2024-01-01"
+          store: tsdb
+          object_store: filesystem
+          schema: v13
+          index:
+            prefix: index_
+            period: 24h
+
+  singleBinary:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    persistence:
+      enabled: true
+      size: 5Gi
+
+  gateway:
+    enabled: false
+
+  monitoring:
+    selfMonitoring:
+      enabled: false
+
+# --- Mimir (metrics) ---
+mimir:
+  mimir:
+    structuredConfig:
+      common:
+        storage:
+          backend: filesystem
+          filesystem:
+            dir: /data/mimir
+      blocks_storage:
+        backend: filesystem
+        filesystem:
+          dir: /data/mimir/blocks
+      ingester:
+        ring:
+          replication_factor: 1
+
+  deploymentMode: monolithic
+
+  monolithic:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    persistence:
+      enabled: true
+      size: 5Gi

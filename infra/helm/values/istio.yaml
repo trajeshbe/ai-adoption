@@ -1,0 +1,67 @@
+# Istio Ambient Mesh
+# Chart: istio/istiod + istio/ztunnel + istio/cni
+---
+profile: ambient
+
+meshConfig:
+  defaultConfig:
+    holdApplicationUntilProxyStarts: true
+  accessLogFile: /dev/stdout
+  accessLogEncoding: JSON
+  enableTracing: true
+  extensionProviders:
+    - name: otel
+      opentelemetry:
+        service: otel-collector.agent-platform.svc.cluster.local
+        port: 4317
+  defaultProviders:
+    tracing:
+      - otel
+
+  # Enforce mTLS across the mesh
+  meshMTLS:
+    minProtocolVersion: TLSV1_3
+
+global:
+  mtls:
+    enabled: true
+
+pilot:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Ztunnel (ambient L4 proxy) DaemonSet
+ztunnel:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+  env:
+    - name: RUST_LOG
+      value: "info"
+
+# CNI plugin for ambient mesh
+cni:
+  enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# PeerAuthentication - strict mTLS
+peerAuthentication:
+  enabled: true
+  mtls:
+    mode: STRICT

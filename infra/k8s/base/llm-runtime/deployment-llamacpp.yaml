@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llm-runtime-llamacpp
+  namespace: agent-platform
+  labels:
+    app.kubernetes.io/name: llm-runtime-llamacpp
+    app.kubernetes.io/part-of: agent-platform
+    app.kubernetes.io/component: inference
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: llm-runtime-llamacpp
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: llm-runtime-llamacpp
+        app.kubernetes.io/part-of: agent-platform
+        app.kubernetes.io/component: inference
+    spec:
+      serviceAccountName: llm-runtime
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: llamacpp
+          image: ghcr.io/ggerganov/llama.cpp:server
+          args:
+            - "--host"
+            - "0.0.0.0"
+            - "--port"
+            - "8080"
+            - "--model"
+            - "/models/model.gguf"
+            - "--ctx-size"
+            - "4096"
+            - "--threads"
+            - "4"
+            - "--parallel"
+            - "2"
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+              name: http
+          env:
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector:4317"
+            - name: OTEL_SERVICE_NAME
+              value: llm-runtime-llamacpp
+          resources:
+            requests:
+              cpu: "4"
+              memory: 8Gi
+            limits:
+              cpu: "4"
+              memory: 8Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: models
+              mountPath: /models
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: llm-models-pvc
+        - name: tmp
+          emptyDir: {}

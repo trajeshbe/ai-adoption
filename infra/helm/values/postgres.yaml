@@ -1,0 +1,56 @@
+# Bitnami PostgreSQL with pgvector
+# Chart: oci://registry-1.docker.io/bitnamicharts/postgresql
+# Version: 15.x
+---
+image:
+  registry: docker.io
+  repository: pgvector/pgvector
+  tag: pg16
+
+auth:
+  postgresPassword: "$(POSTGRES_PASSWORD)"
+  database: agent_platform
+  username: agent_platform
+  password: "$(POSTGRES_USER_PASSWORD)"
+
+primary:
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: ""
+
+  initdb:
+    scripts:
+      init-extensions.sql: |
+        CREATE EXTENSION IF NOT EXISTS vector;
+        CREATE EXTENSION IF NOT EXISTS pg_trgm;
+        CREATE EXTENSION IF NOT EXISTS btree_gin;
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+  podSecurityContext:
+    enabled: true
+    fsGroup: 1001
+
+  containerSecurityContext:
+    enabled: true
+    runAsUser: 1001
+    runAsNonRoot: true
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+
+networkPolicy:
+  enabled: true
+  allowExternal: false
+
+backup:
+  enabled: false

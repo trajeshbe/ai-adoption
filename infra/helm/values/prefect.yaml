@@ -1,0 +1,41 @@
+# Prefect 3 Server
+# Chart: helm repo add prefect https://prefecthq.github.io/prefect-helm/
+# Chart: prefect/prefect-server
+---
+server:
+  image:
+    repository: prefecthq/prefect
+    prefectTag: 3-latest
+
+  env:
+    - name: PREFECT_API_URL
+      value: "http://prefect-server:4200/api"
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+  service:
+    type: ClusterIP
+    port: 4200
+
+  prefectApiUrl: "http://prefect-server:4200/api"
+
+postgresql:
+  enabled: true
+  auth:
+    password: "$(PREFECT_DB_PASSWORD)"
+    database: prefect
+  primary:
+    persistence:
+      enabled: true
+      size: 5Gi
+
+  useSubChart: true
+
+ingress:
+  enabled: false

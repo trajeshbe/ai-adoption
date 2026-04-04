@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-engine
+  namespace: agent-platform
+  labels:
+    app.kubernetes.io/name: agent-engine
+    app.kubernetes.io/part-of: agent-platform
+    app.kubernetes.io/component: orchestration
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agent-engine
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: agent-engine
+        app.kubernetes.io/part-of: agent-platform
+        app.kubernetes.io/component: orchestration
+    spec:
+      serviceAccountName: agent-engine
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: agent-engine
+          image: ghcr.io/agent-platform/agent-engine:latest
+          ports:
+            - containerPort: 8003
+              protocol: TCP
+              name: http
+          envFrom:
+            - configMapRef:
+                name: agent-engine-config
+            - secretRef:
+                name: agent-engine-secrets
+          env:
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector:4317"
+            - name: OTEL_SERVICE_NAME
+              value: agent-engine
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

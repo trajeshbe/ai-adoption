@@ -1,0 +1,74 @@
+# vLLM on KubeRay - RayCluster for GPU inference
+# Deployed via KubeRay RayService CRD
+---
+rayCluster:
+  head:
+    replicas: 1
+    resources:
+      requests:
+        cpu: "2"
+        memory: 8Gi
+      limits:
+        cpu: "4"
+        memory: 16Gi
+    serviceType: ClusterIP
+
+  worker:
+    groupName: gpu-workers
+    replicas: 1
+    minReplicas: 0
+    maxReplicas: 4
+    resources:
+      requests:
+        cpu: "2"
+        memory: 16Gi
+        nvidia.com/gpu: "1"
+      limits:
+        cpu: "4"
+        memory: 32Gi
+        nvidia.com/gpu: "1"
+    tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+    nodeSelector:
+      accelerator: nvidia-gpu
+
+vllm:
+  image:
+    repository: vllm/vllm-openai
+    tag: v0.6.4
+  model: meta-llama/Llama-3.1-8B-Instruct
+  serveArgs:
+    - "--model"
+    - "meta-llama/Llama-3.1-8B-Instruct"
+    - "--max-model-len"
+    - "4096"
+    - "--tensor-parallel-size"
+    - "1"
+    - "--dtype"
+    - "auto"
+    - "--enforce-eager"
+  env:
+    - name: HUGGING_FACE_HUB_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: hf-token
+          key: token
+
+service:
+  type: ClusterIP
+  port: 8000
+  targetPort: 8000
+
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 80

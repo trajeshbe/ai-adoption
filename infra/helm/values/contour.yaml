@@ -1,0 +1,45 @@
+# Contour / Envoy Ingress Controller
+# Chart: bitnami/contour
+---
+envoy:
+  service:
+    type: LoadBalancer
+    annotations: {}
+    externalTrafficPolicy: Local
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+contour:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi
+
+  ingressClass:
+    name: contour
+    default: true
+
+  manageCRDs: true
+
+# Enable HTTPProxy CRD support
+existingResourcesPolicy: keep
+
+defaultBackend:
+  enabled: false
+
+metrics:
+  serviceMonitor:
+    enabled: true
+
+# Rate limiting
+rateLimitService:
+  enabled: false

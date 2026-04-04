@@ -1,0 +1,55 @@
+# Redis 7.2 Stack with RediSearch for Vector Similarity Search
+# Chart: oci://registry-1.docker.io/bitnamicharts/redis
+# Version: 19.x
+---
+image:
+  registry: docker.io
+  repository: redis/redis-stack-server
+  tag: 7.2.0-v13
+
+architecture: standalone
+
+auth:
+  enabled: true
+  password: "$(REDIS_PASSWORD)"
+
+master:
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClass: ""
+
+  configuration: |
+    maxmemory-policy allkeys-lru
+    maxmemory 512mb
+    loadmodule /opt/redis-stack/lib/redisearch.so
+    loadmodule /opt/redis-stack/lib/rejson.so
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 768Mi
+
+  podSecurityContext:
+    enabled: true
+    fsGroup: 1001
+
+  containerSecurityContext:
+    enabled: true
+    runAsUser: 1001
+    runAsNonRoot: true
+
+replica:
+  replicaCount: 0
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+
+networkPolicy:
+  enabled: true
+  allowExternal: false

@@ -1,0 +1,162 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: agent-platform
+
+resources:
+  - ../../base
+
+patches:
+  # Single replica for all deployments in dev
+  - target:
+      kind: Deployment
+      group: apps
+      version: v1
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 1
+
+  # Relaxed resource limits for dev
+  - target:
+      kind: Deployment
+      group: apps
+      version: v1
+      name: gateway
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 250m
+            memory: 256Mi
+
+  - target:
+      kind: Deployment
+      group: apps
+      version: v1
+      name: agent-engine
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+  - target:
+      kind: Deployment
+      group: apps
+      version: v1
+      name: document-service
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 250m
+            memory: 256Mi
+
+  - target:
+      kind: Deployment
+      group: apps
+      version: v1
+      name: cache-service
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 125m
+            memory: 128Mi
+
+  - target:
+      kind: Deployment
+      group: apps
+      version: v1
+      name: cost-tracker
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 25m
+            memory: 64Mi
+          limits:
+            cpu: 125m
+            memory: 128Mi
+
+  - target:
+      kind: Deployment
+      group: apps
+      version: v1
+      name: frontend
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            cpu: 250m
+            memory: 256Mi
+
+  - target:
+      kind: Deployment
+      group: apps
+      version: v1
+      name: llm-runtime-llamacpp
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 1
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: "2"
+            memory: 4Gi
+          limits:
+            cpu: "2"
+            memory: 4Gi
+
+  # Disable HPA in dev (keep min=max=1)
+  - target:
+      kind: HorizontalPodAutoscaler
+      group: autoscaling
+      version: v2
+    patch: |
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 1
+
+  # Add debug port for all services
+  - target:
+      kind: Deployment
+      group: apps
+      version: v1
+    patch: |
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: LOG_LEVEL
+          value: DEBUG
+
+commonLabels:
+  environment: dev

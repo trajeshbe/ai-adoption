@@ -1,0 +1,178 @@
+# OPA Gatekeeper
+# Chart: gatekeeper/gatekeeper
+---
+replicas: 1
+
+audit:
+  enabled: true
+  interval: 60
+  fromCache: true
+  logLevel: INFO
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+controllerManager:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# Constraint Templates shipped with the chart
+constraintTemplates:
+  # Require specific labels on all resources
+  - apiVersion: templates.gatekeeper.sh/v1
+    kind: ConstraintTemplate
+    metadata:
+      name: k8srequiredlabels
+    spec:
+      crd:
+        spec:
+          names:
+            kind: K8sRequiredLabels
+          validation:
+            openAPIV3Schema:
+              type: object
+              properties:
+                labels:
+                  type: array
+                  items:
+                    type: string
+      targets:
+        - target: admission.k8s.gatekeeper.sh
+          rego: |
+            package k8srequiredlabels
+            violation[{"msg": msg}] {
+              provided := {label | input.review.object.metadata.labels[label]}
+              required := {label | label := input.parameters.labels[_]}
+              missing := required - provided
+              count(missing) > 0
+              msg := sprintf("Missing required labels: %v", [missing])
+            }
+
+  # Restrict allowed container image repositories
+  - apiVersion: templates.gatekeeper.sh/v1
+    kind: ConstraintTemplate
+    metadata:
+      name: k8sallowedrepos
+    spec:
+      crd:
+        spec:
+          names:
+            kind: K8sAllowedRepos
+          validation:
+            openAPIV3Schema:
+              type: object
+              properties:
+                repos:
+                  type: array
+                  items:
+                    type: string
+      targets:
+        - target: admission.k8s.gatekeeper.sh
+          rego: |
+            package k8sallowedrepos
+            violation[{"msg": msg}] {
+              container := input.review.object.spec.containers[_]
+              not startswith_any(container.image, input.parameters.repos)
+              msg := sprintf("Container image '%v' is not from an allowed repository. Allowed: %v", [container.image, input.parameters.repos])
+            }
+            startswith_any(str, prefixes) {
+              prefix := prefixes[_]
+              startswith(str, prefix)
+            }
+
+  # Enforce resource limits on all containers
+  - apiVersion: templates.gatekeeper.sh/v1
+    kind: ConstraintTemplate
+    metadata:
+      name: k8sresourcelimits
+    spec:
+      crd:
+        spec:
+          names:
+            kind: K8sResourceLimits
+          validation:
+            openAPIV3Schema:
+              type: object
+              properties:
+                requiredResources:
+                  type: array
+                  items:
+                    type: string
+      targets:
+        - target: admission.k8s.gatekeeper.sh
+          rego: |
+            package k8sresourcelimits
+            violation[{"msg": msg}] {
+              container := input.review.object.spec.containers[_]
+              resource := input.parameters.requiredResources[_]
+              not container.resources.limits[resource]
+              msg := sprintf("Container '%v' must have resource limit for '%v'", [container.name, resource])
+            }
+            violation[{"msg": msg}] {
+              container := input.review.object.spec.containers[_]
+              resource := input.parameters.requiredResources[_]
+              not container.resources.requests[resource]
+              msg := sprintf("Container '%v' must have resource request for '%v'", [container.name, resource])
+            }
+
+# Constraints using the templates above
+constraints:
+  - apiVersion: constraints.gatekeeper.sh/v1beta1
+    kind: K8sRequiredLabels
+    metadata:
+      name: require-app-labels
+    spec:
+      enforcementAction: warn
+      match:
+        kinds:
+          - apiGroups: ["apps"]
+            kinds: ["Deployment"]
+        namespaces: ["agent-platform"]
+      parameters:
+        labels:
+          - app.kubernetes.io/name
+          - app.kubernetes.io/part-of
+
+  - apiVersion: constraints.gatekeeper.sh/v1beta1
+    kind: K8sAllowedRepos
+    metadata:
+      name: allowed-repos
+    spec:
+      enforcementAction: warn
+      match:
+        kinds:
+          - apiGroups: [""]
+            kinds: ["Pod"]
+        namespaces: ["agent-platform"]
+      parameters:
+        repos:
+          - "ghcr.io/agent-platform/"
+          - "docker.io/library/"
+          - "gcr.io/"
+          - "registry.k8s.io/"
+          - "quay.io/"
+
+  - apiVersion: constraints.gatekeeper.sh/v1beta1
+    kind: K8sResourceLimits
+    metadata:
+      name: require-resource-limits
+    spec:
+      enforcementAction: warn
+      match:
+        kinds:
+          - apiGroups: [""]
+            kinds: ["Pod"]
+        namespaces: ["agent-platform"]
+      parameters:
+        requiredResources:
+          - cpu
+          - memory

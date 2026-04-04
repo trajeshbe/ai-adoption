@@ -1,0 +1,50 @@
+# MinIO Object Storage
+# Chart: oci://registry-1.docker.io/bitnamicharts/minio
+# Version: 14.x
+---
+mode: standalone
+
+auth:
+  rootUser: "$(MINIO_ROOT_USER)"
+  rootPassword: "$(MINIO_ROOT_PASSWORD)"
+
+defaultBuckets: documents
+
+persistence:
+  enabled: true
+  size: 20Gi
+  storageClass: ""
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+podSecurityContext:
+  enabled: true
+  fsGroup: 1001
+
+containerSecurityContext:
+  enabled: true
+  runAsUser: 1001
+  runAsNonRoot: true
+
+service:
+  type: ClusterIP
+  ports:
+    api: 9000
+    console: 9001
+
+ingress:
+  enabled: false
+
+metrics:
+  serviceMonitor:
+    enabled: true
+
+networkPolicy:
+  enabled: true
+  allowExternal: false

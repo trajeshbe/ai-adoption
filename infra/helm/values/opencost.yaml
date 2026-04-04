@@ -1,0 +1,51 @@
+# OpenCost
+# Chart: opencost/opencost
+---
+opencost:
+  exporter:
+    defaultClusterId: agent-platform-cluster
+    image:
+      repository: ghcr.io/opencost/opencost
+      tag: 1.112.0
+
+  prometheus:
+    internal:
+      enabled: true
+      serviceName: mimir
+      namespaceName: agent-platform
+      port: 9009
+
+  ui:
+    enabled: true
+    image:
+      repository: ghcr.io/opencost/opencost-ui
+      tag: 1.112.0
+
+  customPricing:
+    enabled: true
+    provider: custom
+    costModel:
+      description: "Custom pricing with GPU node costs"
+      CPU: "0.031611"
+      RAM: "0.004237"
+      GPU: "0.95"
+      storage: "0.00005479452"
+      spotCPU: "0.006655"
+      spotRAM: "0.000892"
+      zoneNetworkEgress: "0.01"
+      regionNetworkEgress: "0.01"
+      internetNetworkEgress: "0.143"
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+service:
+  type: ClusterIP
+
+serviceMonitor:
+  enabled: true
