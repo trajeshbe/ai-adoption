@@ -1,0 +1,69 @@
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: k8sresourcelimits
+  annotations:
+    description: >-
+      Requires CPU and memory limits on all containers.
+      Warns if resource requests are missing.
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sResourceLimits
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties: {}
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8sresourcelimits
+
+        violation[{"msg": msg}] {
+          container := input_containers[_]
+          not container.resources.limits.cpu
+          msg := sprintf("Container <%v> does not have a CPU limit set. All containers must define resources.limits.cpu", [
+            container.name,
+          ])
+        }
+
+        violation[{"msg": msg}] {
+          container := input_containers[_]
+          not container.resources.limits.memory
+          msg := sprintf("Container <%v> does not have a memory limit set. All containers must define resources.limits.memory", [
+            container.name,
+          ])
+        }
+
+        warn[{"msg": msg}] {
+          container := input_containers[_]
+          not container.resources.requests.cpu
+          msg := sprintf("Container <%v> does not have a CPU request set. It is recommended to define resources.requests.cpu", [
+            container.name,
+          ])
+        }
+
+        warn[{"msg": msg}] {
+          container := input_containers[_]
+          not container.resources.requests.memory
+          msg := sprintf("Container <%v> does not have a memory request set. It is recommended to define resources.requests.memory", [
+            container.name,
+          ])
+        }
+
+        input_containers[c] {
+          c := input.review.object.spec.containers[_]
+        }
+
+        input_containers[c] {
+          c := input.review.object.spec.initContainers[_]
+        }
+
+        input_containers[c] {
+          c := input.review.object.spec.template.spec.containers[_]
+        }
+
+        input_containers[c] {
+          c := input.review.object.spec.template.spec.initContainers[_]
+        }

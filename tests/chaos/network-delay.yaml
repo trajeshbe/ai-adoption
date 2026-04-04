@@ -1,0 +1,155 @@
+---
+# LitmusChaos ChaosEngine -- Network Delay between agent-engine and llm-runtime
+# Injects 200ms network delay for 60s.
+# Verifies: circuit breaker triggers, requests still complete with higher latency.
+#
+# Apply:
+#   kubectl apply -f tests/chaos/network-delay.yaml
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: network-delay-agent-llm
+  namespace: agent-platform
+  labels:
+    app.kubernetes.io/part-of: agent-platform
+    app.kubernetes.io/component: chaos-test
+spec:
+  appinfo:
+    appns: agent-platform
+    applabel: app.kubernetes.io/name=agent-engine
+    appkind: deployment
+  engineState: active
+  chaosServiceAccount: litmus-admin
+  experiments:
+    - name: pod-network-latency
+      spec:
+        components:
+          env:
+            # 200ms network delay
+            - name: NETWORK_LATENCY
+              value: "200"
+            - name: JITTER
+              value: "20"
+            # Total duration of the experiment
+            - name: TOTAL_CHAOS_DURATION
+              value: "60"
+            # Target traffic destined for llm-runtime service
+            - name: DESTINATION_IPS
+              value: ""
+            - name: DESTINATION_HOSTS
+              value: "llm-runtime.agent-platform.svc.cluster.local"
+            - name: NETWORK_INTERFACE
+              value: "eth0"
+            - name: TARGET_CONTAINER
+              value: ""
+            - name: PODS_AFFECTED_PERC
+              value: "100"
+            - name: CONTAINER_RUNTIME
+              value: "containerd"
+            - name: SOCKET_PATH
+              value: "/run/containerd/containerd.sock"
+        probe:
+          - name: agent-engine-responds
+            type: httpProbe
+            mode: Continuous
+            httpProbe/inputs:
+              url: http://gateway.agent-platform.svc.cluster.local:8000/healthz
+              method:
+                get:
+                  criteria: ==
+                  responseCode: "200"
+              insecureSkipVerify: false
+            runProperties:
+              probeTimeout: 10s
+              interval: 10s
+              retry: 3
+              probePollingInterval: 5s
+              initialDelay: 5s
+          - name: requests-still-complete
+            type: httpProbe
+            mode: Continuous
+            httpProbe/inputs:
+              url: http://gateway.agent-platform.svc.cluster.local:8000/graphql
+              method:
+                post:
+                  contentType: application/json
+                  body: '{"query":"{ agents { id } }"}'
+                  criteria: ==
+                  responseCode: "200"
+              insecureSkipVerify: false
+            runProperties:
+              probeTimeout: 15s
+              interval: 15s
+              retry: 2
+              probePollingInterval: 5s
+              initialDelay: 10s
+          - name: circuit-breaker-metrics
+            type: cmdProbe
+            mode: OnChaos
+            cmdProbe/inputs:
+              command: >-
+                kubectl exec -n agent-platform
+                deploy/agent-engine --
+                curl -s http://localhost:9090/metrics |
+                grep circuit_breaker_state |
+                grep -c "open\|half_open"
+              comparator:
+                type: int
+                criteria: ">="
+                value: "0"
+            runProperties:
+              probeTimeout: 10s
+              interval: 20s
+              retry: 3
+              initialDelay: 30s
+---
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosExperiment
+metadata:
+  name: pod-network-latency
+  namespace: agent-platform
+  labels:
+    app.kubernetes.io/part-of: agent-platform
+spec:
+  definition:
+    scope: Namespaced
+    permissions:
+      - apiGroups: [""]
+        resources: ["pods"]
+        verbs: ["create", "delete", "get", "list", "patch", "update", "deletecollection"]
+      - apiGroups: [""]
+        resources: ["events"]
+        verbs: ["create", "get", "list", "patch", "update"]
+      - apiGroups: [""]
+        resources: ["pods/log", "pods/exec"]
+        verbs: ["get", "list", "create"]
+      - apiGroups: ["apps"]
+        resources: ["deployments", "replicasets"]
+        verbs: ["get", "list"]
+      - apiGroups: ["batch"]
+        resources: ["jobs"]
+        verbs: ["create", "list", "get", "delete", "deletecollection"]
+      - apiGroups: ["litmuschaos.io"]
+        resources: ["chaosengines", "chaosexperiments", "chaosresults"]
+        verbs: ["create", "list", "get", "patch", "update", "delete"]
+    image: litmuschaos/go-runner:latest
+    imagePullPolicy: Always
+    args:
+      - -c
+      - ./experiments -name pod-network-latency
+    command:
+      - /bin/bash
+    env:
+      - name: TOTAL_CHAOS_DURATION
+        value: "60"
+      - name: NETWORK_LATENCY
+        value: "200"
+      - name: JITTER
+        value: "20"
+      - name: CONTAINER_RUNTIME
+        value: "containerd"
+      - name: SOCKET_PATH
+        value: "/run/containerd/containerd.sock"
+    labels:
+      name: pod-network-latency
+      app.kubernetes.io/part-of: litmus

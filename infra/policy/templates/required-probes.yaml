@@ -1,0 +1,56 @@
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: k8srequiredprobes
+  annotations:
+    description: >-
+      Requires all containers to define both livenessProbe and readinessProbe
+      for reliable health checking and service discovery.
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sRequiredProbes
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            probes:
+              type: array
+              description: A list of probe types that must be defined (e.g. livenessProbe, readinessProbe).
+              items:
+                type: string
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8srequiredprobes
+
+        violation[{"msg": msg}] {
+          container := input_containers[_]
+          probe := input.parameters.probes[_]
+          not has_probe(container, probe)
+          msg := sprintf("Container <%v> is missing required probe: %v", [
+            container.name,
+            probe,
+          ])
+        }
+
+        has_probe(container, "livenessProbe") {
+          container.livenessProbe
+        }
+
+        has_probe(container, "readinessProbe") {
+          container.readinessProbe
+        }
+
+        has_probe(container, "startupProbe") {
+          container.startupProbe
+        }
+
+        input_containers[c] {
+          c := input.review.object.spec.template.spec.containers[_]
+        }
+
+        input_containers[c] {
+          c := input.review.object.spec.template.spec.initContainers[_]
+        }

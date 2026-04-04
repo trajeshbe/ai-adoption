@@ -1,0 +1,80 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: test
+  namespace: agent-platform
+  labels:
+    app.kubernetes.io/part-of: agent-platform
+spec:
+  description: Run unit tests for Python services (pytest) or frontend (vitest)
+  workspaces:
+    - name: source
+      description: The source code workspace
+  params:
+    - name: service-name
+      type: string
+      description: Name of the service to test
+  steps:
+    - name: run-tests
+      image: python:3.11-slim
+      workingDir: $(workspaces.source.path)
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        SERVICE="$(params.service-name)"
+        SERVICE_PATH="services/$SERVICE"
+
+        if [ "$SERVICE" = "frontend" ]; then
+          echo "=== Frontend detected, deferring to vitest step ==="
+          exit 0
+        fi
+
+        if [ -d "$SERVICE_PATH" ]; then
+          echo "=== Installing dependencies for $SERVICE ==="
+          pip install --quiet uv
+          cd "$SERVICE_PATH"
+
+          if [ -f "pyproject.toml" ]; then
+            uv pip install --system -e ".[test]" 2>/dev/null || \
+              uv pip install --system -e ".[dev]" 2>/dev/null || \
+              uv pip install --system -e . 2>/dev/null
+          fi
+
+          pip install --quiet pytest pytest-cov pytest-asyncio
+
+          echo "=== Running pytest for $SERVICE ==="
+          python -m pytest tests/ -v --tb=short --cov=src --cov-report=term-missing
+
+          echo "=== Tests complete for $SERVICE ==="
+        else
+          echo "=== Service path $SERVICE_PATH not found ==="
+          exit 1
+        fi
+    - name: run-frontend-tests
+      image: node:20-slim
+      workingDir: $(workspaces.source.path)
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        SERVICE="$(params.service-name)"
+
+        if [ "$SERVICE" != "frontend" ]; then
+          echo "=== Not frontend, skipping vitest ==="
+          exit 0
+        fi
+
+        if [ -d "frontend" ] && [ -f "frontend/package.json" ]; then
+          cd frontend
+          echo "=== Installing dependencies ==="
+          npm ci --quiet
+
+          echo "=== Running vitest ==="
+          npx vitest run --coverage
+
+          echo "=== Frontend tests complete ==="
+        else
+          echo "=== Frontend not found ==="
+          exit 1
+        fi

@@ -1,0 +1,19 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sNoPrivileged
+metadata:
+  name: no-privileged-containers
+  annotations:
+    description: >-
+      Blocks privileged containers and containers running as root
+      across all namespaces except kube-system.
+spec:
+  enforcementAction: deny
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+      - apiGroups: ["apps"]
+        kinds: ["Deployment", "StatefulSet", "DaemonSet"]
+    excludedNamespaces:
+      - kube-system
+  parameters: {}

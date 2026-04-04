@@ -1,0 +1,70 @@
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: k8snoprivileged
+  annotations:
+    description: >-
+      Blocks privileged containers and containers running as root.
+      securityContext.privileged must be false or absent, and
+      runAsNonRoot must be true or runAsUser must be non-zero.
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sNoPrivileged
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties: {}
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8snoprivileged
+
+        violation[{"msg": msg}] {
+          container := input_containers[_]
+          container.securityContext.privileged == true
+          msg := sprintf("Container <%v> is running as privileged, which is not allowed", [
+            container.name,
+          ])
+        }
+
+        violation[{"msg": msg}] {
+          container := input_containers[_]
+          container.securityContext.runAsUser == 0
+          msg := sprintf("Container <%v> is running as root (runAsUser: 0), which is not allowed", [
+            container.name,
+          ])
+        }
+
+        violation[{"msg": msg}] {
+          spec := input_pod_spec
+          spec.securityContext.runAsUser == 0
+          msg := sprintf("Pod %v has runAsUser set to 0 (root) in the pod security context, which is not allowed", [
+            input.review.object.metadata.name,
+          ])
+        }
+
+        input_containers[c] {
+          c := input.review.object.spec.containers[_]
+        }
+
+        input_containers[c] {
+          c := input.review.object.spec.initContainers[_]
+        }
+
+        input_containers[c] {
+          c := input.review.object.spec.template.spec.containers[_]
+        }
+
+        input_containers[c] {
+          c := input.review.object.spec.template.spec.initContainers[_]
+        }
+
+        input_pod_spec = spec {
+          spec := input.review.object.spec
+        }
+
+        input_pod_spec = spec {
+          spec := input.review.object.spec.template.spec
+        }

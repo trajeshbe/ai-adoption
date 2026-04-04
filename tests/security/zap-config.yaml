@@ -1,0 +1,138 @@
+# OWASP ZAP DAST configuration for the GraphQL gateway.
+#
+# Usage with ZAP Docker:
+#   docker run --rm -v $(pwd)/tests/security:/zap/config \
+#     -t ghcr.io/zaproxy/zaproxy:stable \
+#     zap-api-scan.py -t http://gateway:8000/graphql \
+#     -f openapi -c /zap/config/zap-config.yaml
+#
+# Or with zap-cli:
+#   zap-cli --zap-url http://localhost:8080 active-scan http://gateway:8000/graphql
+
+env:
+  contexts:
+    - name: agent-platform-gateway
+      urls:
+        - http://gateway.agent-platform.svc.cluster.local:8000
+      includePaths:
+        - "http://gateway.agent-platform.svc.cluster.local:8000/graphql.*"
+      excludePaths:
+        - "http://gateway.agent-platform.svc.cluster.local:8000/healthz"
+        - "http://gateway.agent-platform.svc.cluster.local:8000/readyz"
+        - "http://gateway.agent-platform.svc.cluster.local:8000/metrics"
+
+      authentication:
+        method: json
+        parameters:
+          loginPageUrl: http://gateway.agent-platform.svc.cluster.local:8000/graphql
+          loginRequestUrl: http://gateway.agent-platform.svc.cluster.local:8000/graphql
+          loginRequestBody: >-
+            {"query":"mutation { login(input: { username: \"{%username%}\", password: \"{%password%}\" }) { token } }"}
+        verification:
+          method: response
+          loggedInRegex: "\\Qtoken\\E"
+          loggedOutRegex: "\\Qunauthorized\\E"
+
+      users:
+        - name: test-user
+          credentials:
+            username: "${ZAP_TEST_USERNAME:-test@example.com}"
+            password: "${ZAP_TEST_PASSWORD:-testpassword123}"
+
+      sessionManagement:
+        method: headers
+        parameters:
+          Authorization: "Bearer {%token%}"
+
+  parameters:
+    failOnError: true
+    progressToStdout: true
+
+jobs:
+  # Passive scan first
+  - type: passiveScan-config
+    parameters:
+      maxAlertsPerRule: 10
+      scanOnlyInScope: true
+      maxBodySizeInBytesToScan: 10000
+
+  # Spider the GraphQL endpoint
+  - type: graphql
+    parameters:
+      endpoint: http://gateway.agent-platform.svc.cluster.local:8000/graphql
+      maxQueryDepth: 5
+      lenientMaxQueryDepthEnabled: true
+      maxAdditionalQueryDepth: 3
+      maxArgsDepth: 5
+      optionalArgsEnabled: true
+      argsType: BOTH
+      querySplitType: LEAF
+      requestMethod: POST_JSON
+
+  # Active scan policies
+  - type: activeScan-config
+    parameters:
+      maxRuleDurationInMins: 5
+      maxScanDurationInMins: 30
+      threadPerHost: 5
+
+  - type: activeScan
+    parameters:
+      context: agent-platform-gateway
+      policy: custom-policy
+    policyDefinition:
+      rules:
+        # SQL Injection (ID: 40018)
+        - id: 40018
+          name: SQL Injection
+          strength: HIGH
+          threshold: MEDIUM
+
+        # Cross Site Scripting - Reflected (ID: 40012)
+        - id: 40012
+          name: Cross Site Scripting (Reflected)
+          strength: HIGH
+          threshold: MEDIUM
+
+        # Cross Site Scripting - Persistent (ID: 40014)
+        - id: 40014
+          name: Cross Site Scripting (Persistent)
+          strength: HIGH
+          threshold: MEDIUM
+
+        # CSRF (ID: 40014)
+        - id: 20012
+          name: Anti-CSRF Tokens Check
+          strength: MEDIUM
+          threshold: LOW
+
+        # Server Side Request Forgery (ID: 40046)
+        - id: 40046
+          name: Server Side Request Forgery
+          strength: HIGH
+          threshold: MEDIUM
+
+        # NoSQL Injection (ID: 40035)
+        - id: 40035
+          name: NoSQL Injection
+          strength: HIGH
+          threshold: MEDIUM
+
+        # Log4Shell (ID: 40043)
+        - id: 40043
+          name: Log4Shell
+          strength: HIGH
+          threshold: MEDIUM
+
+  # Generate reports
+  - type: report
+    parameters:
+      template: traditional-json
+      reportDir: /zap/results
+      reportFile: zap-report.json
+
+  - type: report
+    parameters:
+      template: traditional-html
+      reportDir: /zap/results
+      reportFile: zap-report.html

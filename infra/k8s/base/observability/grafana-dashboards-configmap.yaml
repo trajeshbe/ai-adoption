@@ -1,0 +1,96 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-provider
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/component: observability
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: agent-platform
+        orgId: 1
+        folder: Agent Platform
+        type: file
+        disableDeletion: false
+        editable: true
+        updateIntervalSeconds: 30
+        options:
+          path: /var/lib/grafana/dashboards
+          foldersFromFilesStructure: false
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-service-overview
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/component: observability
+    grafana_dashboard: "1"
+data:
+  service-overview.json: |
+    {
+      "annotations": { "list": [] },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "links": [],
+      "panels": [],
+      "schemaVersion": 39,
+      "tags": ["agent-platform"],
+      "templating": { "list": [] },
+      "time": { "from": "now-1h", "to": "now" },
+      "title": "Service Overview",
+      "uid": "service-overview"
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-llm-performance
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/component: observability
+    grafana_dashboard: "1"
+data:
+  llm-performance.json: |
+    {
+      "annotations": { "list": [] },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "links": [],
+      "panels": [],
+      "schemaVersion": 39,
+      "tags": ["agent-platform", "llm"],
+      "templating": { "list": [] },
+      "time": { "from": "now-1h", "to": "now" },
+      "title": "LLM Performance",
+      "uid": "llm-performance"
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-agent-execution
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/component: observability
+    grafana_dashboard: "1"
+data:
+  agent-execution.json: |
+    {
+      "annotations": { "list": [] },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "links": [],
+      "panels": [],
+      "schemaVersion": 39,
+      "tags": ["agent-platform", "agents"],
+      "templating": { "list": [] },
+      "time": { "from": "now-1h", "to": "now" },
+      "title": "Agent Execution",
+      "uid": "agent-execution"
+    }

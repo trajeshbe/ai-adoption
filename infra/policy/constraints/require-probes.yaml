@@ -1,0 +1,20 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sRequiredProbes
+metadata:
+  name: require-health-probes
+  annotations:
+    description: >-
+      Requires all Deployment containers in the agent-platform namespace
+      to define livenessProbe and readinessProbe.
+spec:
+  enforcementAction: deny
+  match:
+    kinds:
+      - apiGroups: ["apps"]
+        kinds: ["Deployment"]
+    namespaces:
+      - agent-platform
+  parameters:
+    probes:
+      - "livenessProbe"
+      - "readinessProbe"

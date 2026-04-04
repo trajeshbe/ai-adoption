@@ -1,0 +1,22 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sAllowedRepos
+metadata:
+  name: allowed-image-repos
+  annotations:
+    description: >-
+      Restricts container images in the agent-platform namespace to
+      approved registries only.
+spec:
+  enforcementAction: deny
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+    namespaces:
+      - agent-platform
+  parameters:
+    repos:
+      - "ghcr.io/trajeshbe/"
+      - "docker.io/library/"
+      - "quay.io/"
+      - "gcr.io/"

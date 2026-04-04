@@ -1,0 +1,57 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: deploy
+  namespace: agent-platform
+  labels:
+    app.kubernetes.io/part-of: agent-platform
+spec:
+  description: Trigger Argo CD sync for an application
+  params:
+    - name: app-name
+      type: string
+      description: Argo CD application name to sync
+    - name: revision
+      type: string
+      description: Git revision to sync to
+      default: HEAD
+    - name: argocd-server
+      type: string
+      description: Argo CD server address
+      default: argocd-server.argocd.svc.cluster.local
+  steps:
+    - name: argocd-sync
+      image: quay.io/argoproj/argocd:v2.12.0
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        echo "=== Logging into Argo CD ==="
+        argocd login "$(params.argocd-server)" \
+          --username admin \
+          --password "$ARGOCD_PASSWORD" \
+          --insecure \
+          --grpc-web
+
+        echo "=== Setting revision for $(params.app-name) to $(params.revision) ==="
+        argocd app set "$(params.app-name)" \
+          --revision "$(params.revision)"
+
+        echo "=== Syncing $(params.app-name) ==="
+        argocd app sync "$(params.app-name)" \
+          --force \
+          --prune \
+          --timeout 300
+
+        echo "=== Waiting for $(params.app-name) to be healthy ==="
+        argocd app wait "$(params.app-name)" \
+          --health \
+          --timeout 300
+
+        echo "=== Deploy complete ==="
+      env:
+        - name: ARGOCD_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: argocd-credentials
+              key: password

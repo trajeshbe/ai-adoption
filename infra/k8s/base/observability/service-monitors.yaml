@@ -1,0 +1,84 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: gateway-monitor
+  labels:
+    app.kubernetes.io/name: gateway
+    app.kubernetes.io/component: observability
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gateway
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: agent-engine-monitor
+  labels:
+    app.kubernetes.io/name: agent-engine
+    app.kubernetes.io/component: observability
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agent-engine
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: document-service-monitor
+  labels:
+    app.kubernetes.io/name: document-service
+    app.kubernetes.io/component: observability
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: document-service
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cache-service-monitor
+  labels:
+    app.kubernetes.io/name: cache-service
+    app.kubernetes.io/component: observability
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cache-service
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cost-tracker-monitor
+  labels:
+    app.kubernetes.io/name: cost-tracker
+    app.kubernetes.io/component: observability
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cost-tracker
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s

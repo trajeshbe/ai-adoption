@@ -1,0 +1,146 @@
+---
+# LitmusChaos ChaosEngine -- CPU Stress on agent-engine
+# Stresses CPU to 80% for 60s on agent-engine pods.
+# Verifies: HPA scales up, requests still served.
+#
+# Apply:
+#   kubectl apply -f tests/chaos/pod-cpu-stress.yaml
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: agent-engine-cpu-stress
+  namespace: agent-platform
+  labels:
+    app.kubernetes.io/part-of: agent-platform
+    app.kubernetes.io/component: chaos-test
+spec:
+  appinfo:
+    appns: agent-platform
+    applabel: app.kubernetes.io/name=agent-engine
+    appkind: deployment
+  engineState: active
+  chaosServiceAccount: litmus-admin
+  experiments:
+    - name: pod-cpu-hog
+      spec:
+        components:
+          env:
+            # Stress CPU to 80%
+            - name: CPU_CORES
+              value: "0"
+            - name: CPU_LOAD
+              value: "80"
+            - name: TOTAL_CHAOS_DURATION
+              value: "60"
+            - name: PODS_AFFECTED_PERC
+              value: "100"
+            - name: TARGET_CONTAINER
+              value: ""
+            - name: CONTAINER_RUNTIME
+              value: "containerd"
+            - name: SOCKET_PATH
+              value: "/run/containerd/containerd.sock"
+            - name: RAMP_TIME
+              value: "5"
+        probe:
+          - name: gateway-still-serves
+            type: httpProbe
+            mode: Continuous
+            httpProbe/inputs:
+              url: http://gateway.agent-platform.svc.cluster.local:8000/healthz
+              method:
+                get:
+                  criteria: ==
+                  responseCode: "200"
+              insecureSkipVerify: false
+            runProperties:
+              probeTimeout: 10s
+              interval: 10s
+              retry: 3
+              probePollingInterval: 5s
+              initialDelay: 5s
+          - name: graphql-responds
+            type: httpProbe
+            mode: Continuous
+            httpProbe/inputs:
+              url: http://gateway.agent-platform.svc.cluster.local:8000/graphql
+              method:
+                post:
+                  contentType: application/json
+                  body: '{"query":"{ agents { id name } }"}'
+                  criteria: ==
+                  responseCode: "200"
+              insecureSkipVerify: false
+            runProperties:
+              probeTimeout: 15s
+              interval: 15s
+              retry: 2
+              probePollingInterval: 5s
+              initialDelay: 10s
+          - name: hpa-scales-up
+            type: cmdProbe
+            mode: OnChaos
+            cmdProbe/inputs:
+              command: >-
+                kubectl get hpa -n agent-platform agent-engine
+                -o jsonpath='{.status.currentReplicas}'
+              comparator:
+                type: int
+                criteria: ">="
+                value: "2"
+            runProperties:
+              probeTimeout: 60s
+              interval: 15s
+              retry: 4
+              initialDelay: 30s
+---
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosExperiment
+metadata:
+  name: pod-cpu-hog
+  namespace: agent-platform
+  labels:
+    app.kubernetes.io/part-of: agent-platform
+spec:
+  definition:
+    scope: Namespaced
+    permissions:
+      - apiGroups: [""]
+        resources: ["pods"]
+        verbs: ["create", "delete", "get", "list", "patch", "update", "deletecollection"]
+      - apiGroups: [""]
+        resources: ["events"]
+        verbs: ["create", "get", "list", "patch", "update"]
+      - apiGroups: [""]
+        resources: ["pods/log", "pods/exec"]
+        verbs: ["get", "list", "create"]
+      - apiGroups: ["apps"]
+        resources: ["deployments", "replicasets"]
+        verbs: ["get", "list"]
+      - apiGroups: ["batch"]
+        resources: ["jobs"]
+        verbs: ["create", "list", "get", "delete", "deletecollection"]
+      - apiGroups: ["litmuschaos.io"]
+        resources: ["chaosengines", "chaosexperiments", "chaosresults"]
+        verbs: ["create", "list", "get", "patch", "update", "delete"]
+    image: litmuschaos/go-runner:latest
+    imagePullPolicy: Always
+    args:
+      - -c
+      - ./experiments -name pod-cpu-hog
+    command:
+      - /bin/bash
+    env:
+      - name: TOTAL_CHAOS_DURATION
+        value: "60"
+      - name: CPU_CORES
+        value: "0"
+      - name: CPU_LOAD
+        value: "80"
+      - name: CONTAINER_RUNTIME
+        value: "containerd"
+      - name: SOCKET_PATH
+        value: "/run/containerd/containerd.sock"
+    labels:
+      name: pod-cpu-hog
+      app.kubernetes.io/part-of: litmus

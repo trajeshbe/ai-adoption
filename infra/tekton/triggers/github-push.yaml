@@ -1,0 +1,257 @@
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: github-push-template
+  namespace: agent-platform
+  labels:
+    app.kubernetes.io/part-of: agent-platform
+spec:
+  params:
+    - name: repo-url
+      description: The Git repository URL
+    - name: revision
+      description: The Git commit SHA
+    - name: service-name
+      description: The service that changed
+    - name: image-name
+      description: The container image name to build
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1
+      kind: PipelineRun
+      metadata:
+        generateName: ci-$(tt.params.service-name)-
+        namespace: agent-platform
+        labels:
+          app.kubernetes.io/part-of: agent-platform
+          tekton.dev/pipeline: ci-pipeline
+      spec:
+        pipelineRef:
+          name: ci-pipeline
+        params:
+          - name: repo-url
+            value: $(tt.params.repo-url)
+          - name: revision
+            value: $(tt.params.revision)
+          - name: service-name
+            value: $(tt.params.service-name)
+          - name: image-name
+            value: $(tt.params.image-name)
+        workspaces:
+          - name: shared-workspace
+            volumeClaimTemplate:
+              spec:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 1Gi
+          - name: docker-config
+            secret:
+              secretName: docker-registry-credentials
+        taskRunTemplate:
+          serviceAccountName: tekton-pipeline-sa
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: github-push-binding
+  namespace: agent-platform
+  labels:
+    app.kubernetes.io/part-of: agent-platform
+spec:
+  params:
+    - name: repo-url
+      value: $(body.repository.clone_url)
+    - name: revision
+      value: $(body.after)
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: github-push-listener
+  namespace: agent-platform
+  labels:
+    app.kubernetes.io/part-of: agent-platform
+spec:
+  serviceAccountName: tekton-triggers-sa
+  triggers:
+    # Gateway service
+    - name: gateway-trigger
+      interceptors:
+        - ref:
+            name: github
+          params:
+            - name: secretRef
+              value:
+                secretName: github-webhook-secret
+                secretKey: secret
+            - name: eventTypes
+              value:
+                - push
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: >-
+                body.commits.exists(c, c.added.exists(f, f.startsWith('services/gateway/'))
+                || c.modified.exists(f, f.startsWith('services/gateway/'))
+                || c.removed.exists(f, f.startsWith('services/gateway/')))
+      bindings:
+        - ref: github-push-binding
+        - name: service-name
+          value: gateway
+        - name: image-name
+          value: ghcr.io/trajeshbe/gateway:$(body.after)
+      template:
+        ref: github-push-template
+
+    # Agent Engine service
+    - name: agent-engine-trigger
+      interceptors:
+        - ref:
+            name: github
+          params:
+            - name: secretRef
+              value:
+                secretName: github-webhook-secret
+                secretKey: secret
+            - name: eventTypes
+              value:
+                - push
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: >-
+                body.commits.exists(c, c.added.exists(f, f.startsWith('services/agent-engine/'))
+                || c.modified.exists(f, f.startsWith('services/agent-engine/'))
+                || c.removed.exists(f, f.startsWith('services/agent-engine/')))
+      bindings:
+        - ref: github-push-binding
+        - name: service-name
+          value: agent-engine
+        - name: image-name
+          value: ghcr.io/trajeshbe/agent-engine:$(body.after)
+      template:
+        ref: github-push-template
+
+    # Document Service
+    - name: document-service-trigger
+      interceptors:
+        - ref:
+            name: github
+          params:
+            - name: secretRef
+              value:
+                secretName: github-webhook-secret
+                secretKey: secret
+            - name: eventTypes
+              value:
+                - push
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: >-
+                body.commits.exists(c, c.added.exists(f, f.startsWith('services/document-service/'))
+                || c.modified.exists(f, f.startsWith('services/document-service/'))
+                || c.removed.exists(f, f.startsWith('services/document-service/')))
+      bindings:
+        - ref: github-push-binding
+        - name: service-name
+          value: document-service
+        - name: image-name
+          value: ghcr.io/trajeshbe/document-service:$(body.after)
+      template:
+        ref: github-push-template
+
+    # Cache Service
+    - name: cache-service-trigger
+      interceptors:
+        - ref:
+            name: github
+          params:
+            - name: secretRef
+              value:
+                secretName: github-webhook-secret
+                secretKey: secret
+            - name: eventTypes
+              value:
+                - push
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: >-
+                body.commits.exists(c, c.added.exists(f, f.startsWith('services/cache-service/'))
+                || c.modified.exists(f, f.startsWith('services/cache-service/'))
+                || c.removed.exists(f, f.startsWith('services/cache-service/')))
+      bindings:
+        - ref: github-push-binding
+        - name: service-name
+          value: cache-service
+        - name: image-name
+          value: ghcr.io/trajeshbe/cache-service:$(body.after)
+      template:
+        ref: github-push-template
+
+    # Cost Tracker
+    - name: cost-tracker-trigger
+      interceptors:
+        - ref:
+            name: github
+          params:
+            - name: secretRef
+              value:
+                secretName: github-webhook-secret
+                secretKey: secret
+            - name: eventTypes
+              value:
+                - push
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: >-
+                body.commits.exists(c, c.added.exists(f, f.startsWith('services/cost-tracker/'))
+                || c.modified.exists(f, f.startsWith('services/cost-tracker/'))
+                || c.removed.exists(f, f.startsWith('services/cost-tracker/')))
+      bindings:
+        - ref: github-push-binding
+        - name: service-name
+          value: cost-tracker
+        - name: image-name
+          value: ghcr.io/trajeshbe/cost-tracker:$(body.after)
+      template:
+        ref: github-push-template
+
+    # Frontend
+    - name: frontend-trigger
+      interceptors:
+        - ref:
+            name: github
+          params:
+            - name: secretRef
+              value:
+                secretName: github-webhook-secret
+                secretKey: secret
+            - name: eventTypes
+              value:
+                - push
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: >-
+                body.commits.exists(c, c.added.exists(f, f.startsWith('frontend/'))
+                || c.modified.exists(f, f.startsWith('frontend/'))
+                || c.removed.exists(f, f.startsWith('frontend/')))
+      bindings:
+        - ref: github-push-binding
+        - name: service-name
+          value: frontend
+        - name: image-name
+          value: ghcr.io/trajeshbe/frontend:$(body.after)
+      template:
+        ref: github-push-template

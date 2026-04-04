@@ -1,0 +1,23 @@
+apiVersion: projectcontour.io/v1
+kind: HTTPProxy
+metadata:
+  name: agent-platform-ingress
+  namespace: agent-platform
+spec:
+  virtualhost:
+    fqdn: agent-platform.local
+    tls:
+      secretName: agent-platform-tls
+  routes:
+    - conditions:
+        - prefix: /graphql
+      services:
+        - name: gateway
+          port: 8000
+      timeoutPolicy:
+        response: 120s
+    - conditions:
+        - prefix: /
+      services:
+        - name: frontend
+          port: 3000

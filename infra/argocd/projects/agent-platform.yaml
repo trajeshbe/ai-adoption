@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: agent-platform
+  namespace: argocd
+spec:
+  description: AI Agent Platform
+  sourceRepos:
+    - 'https://github.com/trajeshbe/ai-adoption.git'
+  destinations:
+    - namespace: agent-platform
+      server: https://kubernetes.default.svc
+    - namespace: istio-system
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+    - group: networking.k8s.io
+      kind: NetworkPolicy

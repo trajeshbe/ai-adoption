@@ -1,0 +1,22 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sRequiredLabels
+metadata:
+  name: require-standard-labels
+  annotations:
+    description: >-
+      Enforces Kubernetes recommended labels on Deployments, StatefulSets,
+      and Services in the agent-platform namespace.
+spec:
+  enforcementAction: deny
+  match:
+    kinds:
+      - apiGroups: ["apps"]
+        kinds: ["Deployment", "StatefulSet"]
+      - apiGroups: [""]
+        kinds: ["Service"]
+    namespaces:
+      - agent-platform
+  parameters:
+    labels:
+      - "app.kubernetes.io/name"
+      - "app.kubernetes.io/part-of"

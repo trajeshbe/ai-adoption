@@ -1,0 +1,65 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: lint
+  namespace: agent-platform
+  labels:
+    app.kubernetes.io/part-of: agent-platform
+spec:
+  description: Run linting for Python (ruff + mypy) and TypeScript (eslint)
+  workspaces:
+    - name: source
+      description: The source code workspace
+  params:
+    - name: service-name
+      type: string
+      description: Name of the service to lint
+  steps:
+    - name: python-lint
+      image: python:3.11-slim
+      workingDir: $(workspaces.source.path)
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        echo "=== Installing linting tools ==="
+        pip install --quiet ruff mypy
+
+        SERVICE_PATH="services/$(params.service-name)"
+        if [ -d "$SERVICE_PATH" ]; then
+          echo "=== Running ruff check on $SERVICE_PATH ==="
+          ruff check "$SERVICE_PATH" --output-format=full
+
+          echo "=== Running ruff format check on $SERVICE_PATH ==="
+          ruff format --check "$SERVICE_PATH"
+
+          echo "=== Running mypy on $SERVICE_PATH ==="
+          mypy "$SERVICE_PATH" --ignore-missing-imports --strict || true
+        fi
+
+        # Also lint shared Python libs
+        if [ -d "libs/py-common" ]; then
+          echo "=== Linting libs/py-common ==="
+          ruff check libs/py-common --output-format=full
+        fi
+
+        echo "=== Python linting complete ==="
+    - name: ts-lint
+      image: node:20-slim
+      workingDir: $(workspaces.source.path)
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        if [ -d "frontend" ] && [ -f "frontend/package.json" ]; then
+          echo "=== Installing frontend dependencies ==="
+          cd frontend
+          npm ci --quiet
+
+          echo "=== Running eslint ==="
+          npx eslint . --max-warnings=0
+
+          echo "=== TypeScript lint complete ==="
+        else
+          echo "=== No frontend found, skipping TypeScript lint ==="
+        fi

@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - peer-authentication.yaml
+  - authorization-policies.yaml
+  - contour-httpproxy.yaml
+  - virtual-service-canary.yaml
+  - destination-rules.yaml
+  - network-policies.yaml

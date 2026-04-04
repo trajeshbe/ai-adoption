@@ -1,0 +1,358 @@
+---
+# PrometheusRule CRD with SLO recording and alerting rules.
+#
+# SLOs:
+#   - Gateway availability: 99.9% (error budget 0.1%)
+#   - Gateway latency: p99 < 1s for 99% of requests
+#   - Agent execution: 99% success rate
+#   - Cache hit rate: > 50%
+#
+# Recording rules compute burn rates over 1h, 6h, and 24h windows.
+# Alert rules use multiwindow multi-burnrate approach (Google SRE).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: slo-rules
+  namespace: agent-platform
+  labels:
+    app.kubernetes.io/part-of: agent-platform
+    app.kubernetes.io/component: observability
+    prometheus: agent-platform
+    role: alert-rules
+spec:
+  groups:
+    # ---------------------------------------------------------------
+    # Recording rules: SLI ratios and burn rates
+    # ---------------------------------------------------------------
+    - name: slo.recording.gateway-availability
+      interval: 30s
+      rules:
+        # Total request rate
+        - record: slo:gateway_requests:rate1h
+          expr: >-
+            sum(rate(http_server_request_duration_seconds_count{
+              service_name="gateway"
+            }[1h]))
+
+        # Error rate (5xx responses)
+        - record: slo:gateway_errors:rate1h
+          expr: >-
+            sum(rate(http_server_request_duration_seconds_count{
+              service_name="gateway",
+              http_response_status_code=~"5.."
+            }[1h]))
+
+        # Availability SLI: 1 - (errors / total)
+        - record: slo:gateway_availability:ratio1h
+          expr: >-
+            1 - (
+              slo:gateway_errors:rate1h
+              / clamp_min(slo:gateway_requests:rate1h, 1)
+            )
+
+        # Burn rates for multiwindow alerting
+        # 1h burn rate
+        - record: slo:gateway_availability:burnrate1h
+          expr: >-
+            slo:gateway_errors:rate1h
+            / clamp_min(slo:gateway_requests:rate1h, 1)
+            / 0.001
+
+        # 6h burn rate
+        - record: slo:gateway_errors:rate6h
+          expr: >-
+            sum(rate(http_server_request_duration_seconds_count{
+              service_name="gateway",
+              http_response_status_code=~"5.."
+            }[6h]))
+
+        - record: slo:gateway_requests:rate6h
+          expr: >-
+            sum(rate(http_server_request_duration_seconds_count{
+              service_name="gateway"
+            }[6h]))
+
+        - record: slo:gateway_availability:burnrate6h
+          expr: >-
+            slo:gateway_errors:rate6h
+            / clamp_min(slo:gateway_requests:rate6h, 1)
+            / 0.001
+
+        # 24h burn rate
+        - record: slo:gateway_errors:rate24h
+          expr: >-
+            sum(rate(http_server_request_duration_seconds_count{
+              service_name="gateway",
+              http_response_status_code=~"5.."
+            }[24h]))
+
+        - record: slo:gateway_requests:rate24h
+          expr: >-
+            sum(rate(http_server_request_duration_seconds_count{
+              service_name="gateway"
+            }[24h]))
+
+        - record: slo:gateway_availability:burnrate24h
+          expr: >-
+            slo:gateway_errors:rate24h
+            / clamp_min(slo:gateway_requests:rate24h, 1)
+            / 0.001
+
+    - name: slo.recording.gateway-latency
+      interval: 30s
+      rules:
+        # p99 latency over 1h
+        - record: slo:gateway_latency_p99:1h
+          expr: >-
+            histogram_quantile(0.99,
+              sum(rate(http_server_request_duration_seconds_bucket{
+                service_name="gateway"
+              }[1h])) by (le)
+            )
+
+        # Fraction of requests faster than 1s
+        - record: slo:gateway_latency_good:ratio1h
+          expr: >-
+            sum(rate(http_server_request_duration_seconds_bucket{
+              service_name="gateway",
+              le="1.0"
+            }[1h]))
+            / clamp_min(
+              sum(rate(http_server_request_duration_seconds_count{
+                service_name="gateway"
+              }[1h])), 1
+            )
+
+        # Latency burn rate (1h)
+        - record: slo:gateway_latency:burnrate1h
+          expr: >-
+            (1 - slo:gateway_latency_good:ratio1h) / 0.01
+
+        # Fraction of requests faster than 1s (6h)
+        - record: slo:gateway_latency_good:ratio6h
+          expr: >-
+            sum(rate(http_server_request_duration_seconds_bucket{
+              service_name="gateway",
+              le="1.0"
+            }[6h]))
+            / clamp_min(
+              sum(rate(http_server_request_duration_seconds_count{
+                service_name="gateway"
+              }[6h])), 1
+            )
+
+        - record: slo:gateway_latency:burnrate6h
+          expr: >-
+            (1 - slo:gateway_latency_good:ratio6h) / 0.01
+
+        # Fraction of requests faster than 1s (24h)
+        - record: slo:gateway_latency_good:ratio24h
+          expr: >-
+            sum(rate(http_server_request_duration_seconds_bucket{
+              service_name="gateway",
+              le="1.0"
+            }[24h]))
+            / clamp_min(
+              sum(rate(http_server_request_duration_seconds_count{
+                service_name="gateway"
+              }[24h])), 1
+            )
+
+        - record: slo:gateway_latency:burnrate24h
+          expr: >-
+            (1 - slo:gateway_latency_good:ratio24h) / 0.01
+
+    - name: slo.recording.agent-execution
+      interval: 30s
+      rules:
+        - record: slo:agent_execution_success:ratio1h
+          expr: >-
+            sum(rate(agent_execution_total{status="success"}[1h]))
+            / clamp_min(
+              sum(rate(agent_execution_total[1h])), 1
+            )
+
+        - record: slo:agent_execution:burnrate1h
+          expr: >-
+            (1 - slo:agent_execution_success:ratio1h) / 0.01
+
+        - record: slo:agent_execution_success:ratio6h
+          expr: >-
+            sum(rate(agent_execution_total{status="success"}[6h]))
+            / clamp_min(
+              sum(rate(agent_execution_total[6h])), 1
+            )
+
+        - record: slo:agent_execution:burnrate6h
+          expr: >-
+            (1 - slo:agent_execution_success:ratio6h) / 0.01
+
+        - record: slo:agent_execution_success:ratio24h
+          expr: >-
+            sum(rate(agent_execution_total{status="success"}[24h]))
+            / clamp_min(
+              sum(rate(agent_execution_total[24h])), 1
+            )
+
+        - record: slo:agent_execution:burnrate24h
+          expr: >-
+            (1 - slo:agent_execution_success:ratio24h) / 0.01
+
+    - name: slo.recording.cache-hit-rate
+      interval: 30s
+      rules:
+        - record: slo:cache_hit_rate:ratio1h
+          expr: >-
+            sum(rate(cache_hits_total[1h]))
+            / clamp_min(
+              sum(rate(cache_requests_total[1h])), 1
+            )
+
+        - record: slo:cache_hit_rate:ratio6h
+          expr: >-
+            sum(rate(cache_hits_total[6h]))
+            / clamp_min(
+              sum(rate(cache_requests_total[6h])), 1
+            )
+
+        - record: slo:cache_hit_rate:ratio24h
+          expr: >-
+            sum(rate(cache_hits_total[24h]))
+            / clamp_min(
+              sum(rate(cache_requests_total[24h])), 1
+            )
+
+    # ---------------------------------------------------------------
+    # Alert rules: Multiwindow multi-burnrate
+    # ---------------------------------------------------------------
+    - name: slo.alerts.gateway-availability
+      rules:
+        # Fast burn: 14.4x burn rate over 1h AND 6x burn rate over 6h
+        # Consumes 2% of 30-day budget in 1h
+        - alert: SLOBudgetBurn_GatewayAvailability_Fast
+          expr: >-
+            slo:gateway_availability:burnrate1h > 14.4
+            and
+            slo:gateway_availability:burnrate6h > 6
+          for: 2m
+          labels:
+            severity: critical
+            slo: gateway-availability
+            window: fast
+          annotations:
+            summary: "Gateway availability SLO budget burning fast"
+            description: >-
+              Gateway error budget is being consumed at {{ $value }}x the sustainable rate.
+              1h burn rate: {{ with query "slo:gateway_availability:burnrate1h" }}{{ . | first | value }}{{ end }}x.
+              At this rate, the 30-day error budget will be exhausted in less than 2 hours.
+            runbook_url: "https://docs.agent-platform.dev/runbooks/gateway-availability"
+
+        # Slow burn: 3x burn rate over 6h AND 1x burn rate over 24h
+        # Consumes budget steadily over days
+        - alert: SLOBudgetBurn_GatewayAvailability_Slow
+          expr: >-
+            slo:gateway_availability:burnrate6h > 3
+            and
+            slo:gateway_availability:burnrate24h > 1
+          for: 15m
+          labels:
+            severity: warning
+            slo: gateway-availability
+            window: slow
+          annotations:
+            summary: "Gateway availability SLO budget burning slowly"
+            description: >-
+              Gateway error budget is being consumed above sustainable rate.
+              6h burn rate: {{ with query "slo:gateway_availability:burnrate6h" }}{{ . | first | value }}{{ end }}x.
+              Review recent error trends.
+            runbook_url: "https://docs.agent-platform.dev/runbooks/gateway-availability"
+
+    - name: slo.alerts.gateway-latency
+      rules:
+        - alert: SLOBudgetBurn_GatewayLatency_Fast
+          expr: >-
+            slo:gateway_latency:burnrate1h > 14.4
+            and
+            slo:gateway_latency:burnrate6h > 6
+          for: 2m
+          labels:
+            severity: critical
+            slo: gateway-latency
+            window: fast
+          annotations:
+            summary: "Gateway latency SLO budget burning fast"
+            description: >-
+              Gateway latency error budget (p99 < 1s) is burning rapidly.
+              Current p99: {{ with query "slo:gateway_latency_p99:1h" }}{{ . | first | value | humanizeDuration }}{{ end }}.
+            runbook_url: "https://docs.agent-platform.dev/runbooks/gateway-latency"
+
+        - alert: SLOBudgetBurn_GatewayLatency_Slow
+          expr: >-
+            slo:gateway_latency:burnrate6h > 3
+            and
+            slo:gateway_latency:burnrate24h > 1
+          for: 15m
+          labels:
+            severity: warning
+            slo: gateway-latency
+            window: slow
+          annotations:
+            summary: "Gateway latency SLO budget burning slowly"
+            description: >-
+              Gateway latency is trending above SLO target.
+              6h good-request ratio: {{ with query "slo:gateway_latency_good:ratio6h" }}{{ . | first | value | humanizePercentage }}{{ end }}.
+            runbook_url: "https://docs.agent-platform.dev/runbooks/gateway-latency"
+
+    - name: slo.alerts.agent-execution
+      rules:
+        - alert: SLOBudgetBurn_AgentExecution_Fast
+          expr: >-
+            slo:agent_execution:burnrate1h > 14.4
+            and
+            slo:agent_execution:burnrate6h > 6
+          for: 2m
+          labels:
+            severity: critical
+            slo: agent-execution
+            window: fast
+          annotations:
+            summary: "Agent execution success rate SLO budget burning fast"
+            description: >-
+              Agent execution failures are consuming the error budget rapidly.
+              1h success ratio: {{ with query "slo:agent_execution_success:ratio1h" }}{{ . | first | value | humanizePercentage }}{{ end }}.
+            runbook_url: "https://docs.agent-platform.dev/runbooks/agent-execution"
+
+        - alert: SLOBudgetBurn_AgentExecution_Slow
+          expr: >-
+            slo:agent_execution:burnrate6h > 3
+            and
+            slo:agent_execution:burnrate24h > 1
+          for: 15m
+          labels:
+            severity: warning
+            slo: agent-execution
+            window: slow
+          annotations:
+            summary: "Agent execution success rate SLO budget burning slowly"
+            description: >-
+              Agent execution failures are trending above sustainable rate.
+            runbook_url: "https://docs.agent-platform.dev/runbooks/agent-execution"
+
+    - name: slo.alerts.cache-hit-rate
+      rules:
+        - alert: CacheHitRateLow
+          expr: >-
+            slo:cache_hit_rate:ratio1h < 0.5
+            and
+            slo:cache_hit_rate:ratio6h < 0.5
+          for: 10m
+          labels:
+            severity: warning
+            slo: cache-hit-rate
+          annotations:
+            summary: "Cache hit rate below 50% SLO"
+            description: >-
+              Cache hit rate has been below 50% for over 10 minutes.
+              1h hit rate: {{ with query "slo:cache_hit_rate:ratio1h" }}{{ . | first | value | humanizePercentage }}{{ end }}.
+              Investigate cache eviction policy or increased cardinality.
+            runbook_url: "https://docs.agent-platform.dev/runbooks/cache-hit-rate"

@@ -1,0 +1,49 @@
+# Trivy configuration for container image scanning.
+#
+# Usage:
+#   trivy image --config tests/security/trivy-config.yaml ghcr.io/trajeshbe/ai-adoption-gateway:latest
+#   trivy image --config tests/security/trivy-config.yaml --format json -o results/trivy-report.json <image>
+#
+# Or scan all images:
+#   ./tests/security/scan-images.sh
+
+# Severity levels to report
+severity:
+  - HIGH
+  - CRITICAL
+
+# Skip vulnerabilities with no available fix
+ignore-unfixed: true
+
+# Scan configuration
+scan:
+  # Scan OS packages and language-specific dependencies
+  security-checks:
+    - vuln
+    - secret
+    - misconfig
+
+# Image list (for reference / CI integration)
+# These are the 6 service images to scan:
+#   - ghcr.io/trajeshbe/ai-adoption-gateway:latest
+#   - ghcr.io/trajeshbe/ai-adoption-agent-engine:latest
+#   - ghcr.io/trajeshbe/ai-adoption-document-service:latest
+#   - ghcr.io/trajeshbe/ai-adoption-cache-service:latest
+#   - ghcr.io/trajeshbe/ai-adoption-cost-tracker:latest
+#   - ghcr.io/trajeshbe/ai-adoption-frontend:latest
+
+# Output configuration
+format: table
+
+# Timeout for scanning
+timeout: 10m0s
+
+# Database settings
+db:
+  skip-update: false
+
+# Vulnerability settings
+vulnerability:
+  type:
+    - os
+    - library

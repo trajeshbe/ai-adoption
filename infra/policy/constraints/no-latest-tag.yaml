@@ -1,0 +1,19 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sNoLatestImage
+metadata:
+  name: no-latest-image-tag
+  annotations:
+    description: >-
+      Blocks container images using the :latest tag or missing a tag
+      entirely in the agent-platform namespace.
+spec:
+  enforcementAction: deny
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+      - apiGroups: ["apps"]
+        kinds: ["Deployment", "StatefulSet", "DaemonSet"]
+    namespaces:
+      - agent-platform
+  parameters: {}

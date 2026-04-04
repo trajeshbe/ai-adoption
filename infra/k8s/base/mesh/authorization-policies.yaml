@@ -1,0 +1,121 @@
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: deny-all
+  namespace: agent-platform
+spec:
+  {}
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: gateway-policy
+  namespace: agent-platform
+spec:
+  selector:
+    matchLabels:
+      app: gateway
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            namespaces:
+              - contour-envoy
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: agent-engine-policy
+  namespace: agent-platform
+spec:
+  selector:
+    matchLabels:
+      app: agent-engine
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/agent-platform/sa/gateway
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: document-service-policy
+  namespace: agent-platform
+spec:
+  selector:
+    matchLabels:
+      app: document-service
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/agent-platform/sa/gateway
+              - cluster.local/ns/agent-platform/sa/agent-engine
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: cache-service-policy
+  namespace: agent-platform
+spec:
+  selector:
+    matchLabels:
+      app: cache-service
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/agent-platform/sa/gateway
+              - cluster.local/ns/agent-platform/sa/agent-engine
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: cost-tracker-policy
+  namespace: agent-platform
+spec:
+  selector:
+    matchLabels:
+      app: cost-tracker
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/agent-platform/sa/gateway
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: llm-runtime-policy
+  namespace: agent-platform
+spec:
+  selector:
+    matchLabels:
+      app: llm-runtime
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/agent-platform/sa/agent-engine
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: frontend-policy
+  namespace: agent-platform
+spec:
+  selector:
+    matchLabels:
+      app: frontend
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            namespaces:
+              - contour-envoy

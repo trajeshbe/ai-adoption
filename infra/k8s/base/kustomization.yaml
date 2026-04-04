@@ -12,6 +12,8 @@ resources:
   - cost-tracker
   - frontend
   - llm-runtime
+  - mesh
+  - observability
 
 commonLabels:
   app.kubernetes.io/managed-by: kustomize

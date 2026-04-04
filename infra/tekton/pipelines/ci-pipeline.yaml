@@ -1,0 +1,109 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: ci-pipeline
+  namespace: agent-platform
+  labels:
+    app.kubernetes.io/part-of: agent-platform
+spec:
+  description: CI pipeline - lint, test, build, scan, deploy
+  params:
+    - name: repo-url
+      type: string
+      description: Git repository URL
+    - name: revision
+      type: string
+      description: Git revision (commit SHA or branch)
+      default: main
+    - name: service-name
+      type: string
+      description: Name of the service to build and deploy
+    - name: image-name
+      type: string
+      description: Full container image name with tag
+  workspaces:
+    - name: shared-workspace
+      description: Shared workspace for the pipeline
+    - name: docker-config
+      description: Docker registry credentials
+  tasks:
+    # Clone the repository
+    - name: git-clone
+      taskRef:
+        name: git-clone
+        kind: ClusterTask
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+      params:
+        - name: url
+          value: $(params.repo-url)
+        - name: revision
+          value: $(params.revision)
+
+    # Lint and test run in parallel after clone
+    - name: lint
+      taskRef:
+        name: lint
+      runAfter:
+        - git-clone
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      params:
+        - name: service-name
+          value: $(params.service-name)
+
+    - name: test
+      taskRef:
+        name: test
+      runAfter:
+        - git-clone
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      params:
+        - name: service-name
+          value: $(params.service-name)
+
+    # Build image after lint and test pass
+    - name: build-image
+      taskRef:
+        name: build-image
+      runAfter:
+        - lint
+        - test
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+        - name: docker-config
+          workspace: docker-config
+      params:
+        - name: image-name
+          value: $(params.image-name)
+        - name: dockerfile
+          value: services/$(params.service-name)/Dockerfile
+        - name: context
+          value: .
+
+    # Scan image after build
+    - name: trivy-scan
+      taskRef:
+        name: trivy-scan
+      runAfter:
+        - build-image
+      params:
+        - name: image-name
+          value: $(params.image-name)
+
+    # Deploy after scan passes
+    - name: deploy
+      taskRef:
+        name: deploy
+      runAfter:
+        - trivy-scan
+      params:
+        - name: app-name
+          value: $(params.service-name)
+        - name: revision
+          value: $(params.revision)

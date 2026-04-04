@@ -1,0 +1,262 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Inference Latency Histogram",
+      "type": "histogram",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "targets": [
+        {
+          "expr": "sum(increase(llm_inference_duration_seconds_bucket{service_namespace=\"agent-platform\"}[5m])) by (le)",
+          "legendFormat": "{{le}}",
+          "refId": "A",
+          "format": "heatmap"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "scheme", "schemeName": "Oranges" },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "bucketOffset": 0,
+        "combine": false,
+        "fillOpacity": 80,
+        "gradientMode": "scheme",
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single" }
+      }
+    },
+    {
+      "title": "Token Throughput",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "targets": [
+        {
+          "expr": "sum(rate(llm_prompt_tokens_total{service_namespace=\"agent-platform\"}[5m]))",
+          "legendFormat": "Prompt tokens/s",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(llm_completion_tokens_total{service_namespace=\"agent-platform\"}[5m]))",
+          "legendFormat": "Completion tokens/s",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "lineWidth": 2,
+            "stacking": { "mode": "none" }
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Prompt tokens/s" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Completion tokens/s" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "calcs": ["mean", "sum"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "title": "Cache Hit Rate",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 8 },
+      "id": 3,
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "targets": [
+        {
+          "expr": "sum(rate(cache_hits_total{service_namespace=\"agent-platform\"}[5m])) / (sum(rate(cache_hits_total{service_namespace=\"agent-platform\"}[5m])) + sum(rate(cache_misses_total{service_namespace=\"agent-platform\"}[5m])))",
+          "legendFormat": "Hit Rate",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.5 },
+              { "color": "green", "value": 0.8 }
+            ]
+          },
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      }
+    },
+    {
+      "title": "Cost per Inference Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 9, "x": 6, "y": 8 },
+      "id": 4,
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "targets": [
+        {
+          "expr": "sum(rate(llm_inference_cost_dollars_total{service_namespace=\"agent-platform\"}[5m])) by (model) / sum(rate(llm_inference_duration_seconds_count{service_namespace=\"agent-platform\"}[5m])) by (model)",
+          "legendFormat": "{{model}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "auto"
+          },
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "calcs": ["mean", "lastNotNull"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "title": "Model Usage Distribution",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 9, "x": 15, "y": 8 },
+      "id": 5,
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "targets": [
+        {
+          "expr": "sum(increase(llm_inference_duration_seconds_count{service_namespace=\"agent-platform\"}[1h])) by (model)",
+          "legendFormat": "{{model}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "values": ["percent", "value"] },
+        "pieType": "donut",
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "single" }
+      }
+    },
+    {
+      "title": "Circuit Breaker State",
+      "type": "state-timeline",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 16 },
+      "id": 6,
+      "datasource": { "type": "prometheus", "uid": "mimir" },
+      "targets": [
+        {
+          "expr": "llm_circuit_breaker_state{service_namespace=\"agent-platform\"}",
+          "legendFormat": "{{service_name}} - {{model}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 2 }
+            ]
+          },
+          "mappings": [
+            { "options": { "0": { "text": "CLOSED", "color": "green" } }, "type": "value" },
+            { "options": { "1": { "text": "HALF-OPEN", "color": "yellow" } }, "type": "value" },
+            { "options": { "2": { "text": "OPEN", "color": "red" } }, "type": "value" }
+          ],
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "alignValue": "center",
+        "mergeValues": true,
+        "rowHeight": 0.8,
+        "showValue": "always",
+        "tooltip": { "mode": "single" }
+      }
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["agent-platform", "llm"],
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": false, "text": "All", "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "mimir" },
+        "definition": "label_values(llm_inference_duration_seconds_count{service_namespace=\"agent-platform\"}, model)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "model",
+        "query": {
+          "query": "label_values(llm_inference_duration_seconds_count{service_namespace=\"agent-platform\"}, model)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "LLM Performance",
+  "uid": "llm-performance",
+  "version": 1
+}

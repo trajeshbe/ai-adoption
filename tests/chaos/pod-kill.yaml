@@ -1,0 +1,127 @@
+---
+# LitmusChaos ChaosEngine -- Gateway Pod Kill
+# Kills 1 gateway pod and verifies recovery within 30s.
+#
+# Prerequisites:
+#   - LitmusChaos operator installed
+#   - pod-delete experiment CRD available
+#
+# Apply:
+#   kubectl apply -f tests/chaos/pod-kill.yaml
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: gateway-pod-kill
+  namespace: agent-platform
+  labels:
+    app.kubernetes.io/part-of: agent-platform
+    app.kubernetes.io/component: chaos-test
+spec:
+  appinfo:
+    appns: agent-platform
+    applabel: app.kubernetes.io/name=gateway
+    appkind: deployment
+  engineState: active
+  chaosServiceAccount: litmus-admin
+  experiments:
+    - name: pod-delete
+      spec:
+        components:
+          env:
+            # Number of pods to kill
+            - name: TOTAL_CHAOS_DURATION
+              value: "30"
+            - name: CHAOS_INTERVAL
+              value: "10"
+            - name: FORCE
+              value: "false"
+            - name: PODS_AFFECTED_PERC
+              value: ""
+            # Kill exactly 1 pod
+            - name: TARGET_PODS
+              value: ""
+            - name: RAMP_TIME
+              value: "0"
+            - name: SEQUENCE
+              value: "parallel"
+        probe:
+          - name: gateway-availability-check
+            type: httpProbe
+            mode: Continuous
+            httpProbe/inputs:
+              url: http://gateway.agent-platform.svc.cluster.local:8000/healthz
+              method:
+                get:
+                  criteria: ==
+                  responseCode: "200"
+              insecureSkipVerify: false
+            runProperties:
+              probeTimeout: 5s
+              interval: 5s
+              retry: 3
+              probePollingInterval: 2s
+              initialDelay: 0s
+          - name: gateway-recovery-time
+            type: cmdProbe
+            mode: Edge
+            cmdProbe/inputs:
+              command: >-
+                kubectl get pods -n agent-platform
+                -l app.kubernetes.io/name=gateway
+                -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}'
+              comparator:
+                type: string
+                criteria: contains
+                value: "True"
+            runProperties:
+              probeTimeout: 30s
+              interval: 5s
+              retry: 6
+              initialDelay: 5s
+---
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosExperiment
+metadata:
+  name: pod-delete
+  namespace: agent-platform
+  labels:
+    app.kubernetes.io/part-of: agent-platform
+spec:
+  definition:
+    scope: Namespaced
+    permissions:
+      - apiGroups: [""]
+        resources: ["pods"]
+        verbs: ["create", "delete", "get", "list", "patch", "update", "deletecollection"]
+      - apiGroups: [""]
+        resources: ["events"]
+        verbs: ["create", "get", "list", "patch", "update"]
+      - apiGroups: [""]
+        resources: ["pods/log"]
+        verbs: ["get", "list", "watch"]
+      - apiGroups: ["apps"]
+        resources: ["deployments", "replicasets"]
+        verbs: ["get", "list"]
+      - apiGroups: ["batch"]
+        resources: ["jobs"]
+        verbs: ["create", "list", "get", "delete", "deletecollection"]
+      - apiGroups: ["litmuschaos.io"]
+        resources: ["chaosengines", "chaosexperiments", "chaosresults"]
+        verbs: ["create", "list", "get", "patch", "update", "delete"]
+    image: litmuschaos/go-runner:latest
+    imagePullPolicy: Always
+    args:
+      - -c
+      - ./experiments -name pod-delete
+    command:
+      - /bin/bash
+    env:
+      - name: TOTAL_CHAOS_DURATION
+        value: "30"
+      - name: CHAOS_INTERVAL
+        value: "10"
+      - name: FORCE
+        value: "false"
+    labels:
+      name: pod-delete
+      app.kubernetes.io/part-of: litmus

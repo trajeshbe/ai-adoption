@@ -1,0 +1,17 @@
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sResourceLimits
+metadata:
+  name: require-resource-limits
+  annotations:
+    description: >-
+      Requires all containers in the agent-platform namespace to define
+      CPU and memory resource limits.
+spec:
+  enforcementAction: deny
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+    namespaces:
+      - agent-platform
+  parameters: {}

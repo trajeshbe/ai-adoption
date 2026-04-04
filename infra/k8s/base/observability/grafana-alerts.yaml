@@ -1,0 +1,317 @@
+---
+# ConfigMap for Grafana alert rule provisioning.
+#
+# Alerts:
+#   - High error rate (> 5% for 5min)
+#   - High latency (p95 > 2s for 5min)
+#   - LLM circuit breaker open
+#   - Cost anomaly (> 2x average)
+#   - Pod restart loop (> 3 restarts in 10min)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-alert-rules
+  namespace: agent-platform
+  labels:
+    app.kubernetes.io/part-of: agent-platform
+    app.kubernetes.io/component: observability
+    grafana_alert: "1"
+data:
+  alert-rules.yaml: |
+    apiVersion: 1
+    groups:
+      - orgId: 1
+        name: agent-platform-alerts
+        folder: Agent Platform
+        interval: 30s
+        rules:
+          # -----------------------------------------------------------
+          # High Error Rate
+          # -----------------------------------------------------------
+          - uid: high-error-rate
+            title: "High Error Rate"
+            condition: error_rate_check
+            data:
+              - refId: error_rate
+                relativeTimeRange:
+                  from: 300
+                  to: 0
+                datasourceUid: prometheus
+                model:
+                  expr: >-
+                    sum(rate(http_server_request_duration_seconds_count{
+                      service_name="gateway",
+                      http_response_status_code=~"5.."
+                    }[5m]))
+                    /
+                    clamp_min(sum(rate(http_server_request_duration_seconds_count{
+                      service_name="gateway"
+                    }[5m])), 0.001)
+                  intervalMs: 1000
+                  maxDataPoints: 43200
+              - refId: error_rate_check
+                relativeTimeRange:
+                  from: 300
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  conditions:
+                    - evaluator:
+                        type: gt
+                        params:
+                          - 0.05
+                      operator:
+                        type: and
+                      query:
+                        params:
+                          - error_rate
+                      reducer:
+                        type: last
+                  expression: error_rate
+            noDataState: OK
+            execErrState: Alerting
+            for: 5m
+            annotations:
+              summary: "Gateway error rate exceeds 5%"
+              description: >-
+                The gateway error rate has been above 5% for the last 5 minutes.
+                Current rate: {{ $values.error_rate }}.
+                Investigate gateway logs and downstream service health.
+              runbook_url: "https://docs.agent-platform.dev/runbooks/high-error-rate"
+            labels:
+              severity: critical
+              team: platform
+
+          # -----------------------------------------------------------
+          # High Latency
+          # -----------------------------------------------------------
+          - uid: high-latency
+            title: "High Latency (p95 > 2s)"
+            condition: latency_check
+            data:
+              - refId: p95_latency
+                relativeTimeRange:
+                  from: 300
+                  to: 0
+                datasourceUid: prometheus
+                model:
+                  expr: >-
+                    histogram_quantile(0.95,
+                      sum(rate(http_server_request_duration_seconds_bucket{
+                        service_name="gateway"
+                      }[5m])) by (le)
+                    )
+                  intervalMs: 1000
+                  maxDataPoints: 43200
+              - refId: latency_check
+                relativeTimeRange:
+                  from: 300
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  conditions:
+                    - evaluator:
+                        type: gt
+                        params:
+                          - 2.0
+                      operator:
+                        type: and
+                      query:
+                        params:
+                          - p95_latency
+                      reducer:
+                        type: last
+                  expression: p95_latency
+            noDataState: OK
+            execErrState: Alerting
+            for: 5m
+            annotations:
+              summary: "Gateway p95 latency exceeds 2 seconds"
+              description: >-
+                Gateway p95 latency has been above 2s for 5 minutes.
+                Current p95: {{ $values.p95_latency }}s.
+                Check downstream service latency and resource utilization.
+              runbook_url: "https://docs.agent-platform.dev/runbooks/high-latency"
+            labels:
+              severity: warning
+              team: platform
+
+          # -----------------------------------------------------------
+          # LLM Circuit Breaker Open
+          # -----------------------------------------------------------
+          - uid: llm-circuit-breaker-open
+            title: "LLM Circuit Breaker Open"
+            condition: cb_check
+            data:
+              - refId: circuit_breaker
+                relativeTimeRange:
+                  from: 300
+                  to: 0
+                datasourceUid: prometheus
+                model:
+                  expr: >-
+                    circuit_breaker_state{
+                      service_name="agent-engine",
+                      target="llm-runtime"
+                    } == 1
+                  intervalMs: 1000
+                  maxDataPoints: 43200
+              - refId: cb_check
+                relativeTimeRange:
+                  from: 300
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  conditions:
+                    - evaluator:
+                        type: gt
+                        params:
+                          - 0.5
+                      operator:
+                        type: and
+                      query:
+                        params:
+                          - circuit_breaker
+                      reducer:
+                        type: last
+                  expression: circuit_breaker
+            noDataState: OK
+            execErrState: Alerting
+            for: 1m
+            annotations:
+              summary: "LLM runtime circuit breaker is open"
+              description: >-
+                The circuit breaker between agent-engine and llm-runtime has been open
+                for over 1 minute. LLM inference requests are being rejected.
+                Check llm-runtime pod health and GPU availability.
+              runbook_url: "https://docs.agent-platform.dev/runbooks/llm-circuit-breaker"
+            labels:
+              severity: critical
+              team: ml-infra
+
+          # -----------------------------------------------------------
+          # Cost Anomaly
+          # -----------------------------------------------------------
+          - uid: cost-anomaly
+            title: "Cost Anomaly (> 2x Average)"
+            condition: cost_check
+            data:
+              - refId: current_cost
+                relativeTimeRange:
+                  from: 3600
+                  to: 0
+                datasourceUid: prometheus
+                model:
+                  expr: >-
+                    sum(rate(inference_cost_total[1h])) * 3600
+                  intervalMs: 1000
+                  maxDataPoints: 43200
+              - refId: avg_cost
+                relativeTimeRange:
+                  from: 86400
+                  to: 0
+                datasourceUid: prometheus
+                model:
+                  expr: >-
+                    avg_over_time(
+                      (sum(rate(inference_cost_total[1h])) * 3600)[24h:1h]
+                    )
+                  intervalMs: 1000
+                  maxDataPoints: 43200
+              - refId: cost_ratio
+                relativeTimeRange:
+                  from: 3600
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: math
+                  expression: "$current_cost / clamp_min($avg_cost, 0.001)"
+              - refId: cost_check
+                relativeTimeRange:
+                  from: 3600
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  conditions:
+                    - evaluator:
+                        type: gt
+                        params:
+                          - 2.0
+                      operator:
+                        type: and
+                      query:
+                        params:
+                          - cost_ratio
+                      reducer:
+                        type: last
+                  expression: cost_ratio
+            noDataState: OK
+            execErrState: OK
+            for: 15m
+            annotations:
+              summary: "Inference cost anomaly detected"
+              description: >-
+                Current hourly inference cost is more than 2x the 24h average.
+                Cost ratio: {{ $values.cost_ratio }}x.
+                Review recent traffic patterns and model usage.
+              runbook_url: "https://docs.agent-platform.dev/runbooks/cost-anomaly"
+            labels:
+              severity: warning
+              team: finops
+
+          # -----------------------------------------------------------
+          # Pod Restart Loop
+          # -----------------------------------------------------------
+          - uid: pod-restart-loop
+            title: "Pod Restart Loop (> 3 in 10min)"
+            condition: restart_check
+            data:
+              - refId: restarts
+                relativeTimeRange:
+                  from: 600
+                  to: 0
+                datasourceUid: prometheus
+                model:
+                  expr: >-
+                    increase(kube_pod_container_status_restarts_total{
+                      namespace="agent-platform"
+                    }[10m]) > 3
+                  intervalMs: 1000
+                  maxDataPoints: 43200
+              - refId: restart_check
+                relativeTimeRange:
+                  from: 600
+                  to: 0
+                datasourceUid: __expr__
+                model:
+                  type: threshold
+                  conditions:
+                    - evaluator:
+                        type: gt
+                        params:
+                          - 0
+                      operator:
+                        type: and
+                      query:
+                        params:
+                          - restarts
+                      reducer:
+                        type: last
+                  expression: restarts
+            noDataState: OK
+            execErrState: Alerting
+            for: 0s
+            annotations:
+              summary: "Pod restart loop detected"
+              description: >-
+                A pod in the agent-platform namespace has restarted more than 3 times
+                in the last 10 minutes. This indicates a CrashLoopBackOff condition.
+                Check pod logs: kubectl logs -n agent-platform <pod-name> --previous
+              runbook_url: "https://docs.agent-platform.dev/runbooks/pod-restart-loop"
+            labels:
+              severity: critical
+              team: platform

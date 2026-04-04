@@ -1,0 +1,255 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: release-pipeline
+  namespace: agent-platform
+  labels:
+    app.kubernetes.io/part-of: agent-platform
+spec:
+  description: Release pipeline - build, scan, deploy staging, integration test, deploy prod
+  params:
+    - name: tag
+      type: string
+      description: Release tag (e.g. v1.2.3)
+    - name: repo-url
+      type: string
+      description: Git repository URL
+      default: https://github.com/trajeshbe/ai-adoption.git
+    - name: registry
+      type: string
+      description: Container image registry
+      default: ghcr.io/trajeshbe
+  workspaces:
+    - name: shared-workspace
+      description: Shared workspace for the pipeline
+    - name: docker-config
+      description: Docker registry credentials
+
+  tasks:
+    # Clone the repository at the release tag
+    - name: git-clone
+      taskRef:
+        name: git-clone
+        kind: ClusterTask
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+      params:
+        - name: url
+          value: $(params.repo-url)
+        - name: revision
+          value: $(params.tag)
+
+    # Build gateway
+    - name: build-gateway
+      taskRef:
+        name: build-image
+      runAfter:
+        - git-clone
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+        - name: docker-config
+          workspace: docker-config
+      params:
+        - name: image-name
+          value: $(params.registry)/gateway:$(params.tag)
+        - name: dockerfile
+          value: services/gateway/Dockerfile
+        - name: context
+          value: .
+
+    - name: scan-gateway
+      taskRef:
+        name: trivy-scan
+      runAfter:
+        - build-gateway
+      params:
+        - name: image-name
+          value: $(params.registry)/gateway:$(params.tag)
+
+    # Build agent-engine
+    - name: build-agent-engine
+      taskRef:
+        name: build-image
+      runAfter:
+        - git-clone
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+        - name: docker-config
+          workspace: docker-config
+      params:
+        - name: image-name
+          value: $(params.registry)/agent-engine:$(params.tag)
+        - name: dockerfile
+          value: services/agent-engine/Dockerfile
+        - name: context
+          value: .
+
+    - name: scan-agent-engine
+      taskRef:
+        name: trivy-scan
+      runAfter:
+        - build-agent-engine
+      params:
+        - name: image-name
+          value: $(params.registry)/agent-engine:$(params.tag)
+
+    # Build document-service
+    - name: build-document-service
+      taskRef:
+        name: build-image
+      runAfter:
+        - git-clone
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+        - name: docker-config
+          workspace: docker-config
+      params:
+        - name: image-name
+          value: $(params.registry)/document-service:$(params.tag)
+        - name: dockerfile
+          value: services/document-service/Dockerfile
+        - name: context
+          value: .
+
+    - name: scan-document-service
+      taskRef:
+        name: trivy-scan
+      runAfter:
+        - build-document-service
+      params:
+        - name: image-name
+          value: $(params.registry)/document-service:$(params.tag)
+
+    # Build cache-service
+    - name: build-cache-service
+      taskRef:
+        name: build-image
+      runAfter:
+        - git-clone
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+        - name: docker-config
+          workspace: docker-config
+      params:
+        - name: image-name
+          value: $(params.registry)/cache-service:$(params.tag)
+        - name: dockerfile
+          value: services/cache-service/Dockerfile
+        - name: context
+          value: .
+
+    - name: scan-cache-service
+      taskRef:
+        name: trivy-scan
+      runAfter:
+        - build-cache-service
+      params:
+        - name: image-name
+          value: $(params.registry)/cache-service:$(params.tag)
+
+    # Build cost-tracker
+    - name: build-cost-tracker
+      taskRef:
+        name: build-image
+      runAfter:
+        - git-clone
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+        - name: docker-config
+          workspace: docker-config
+      params:
+        - name: image-name
+          value: $(params.registry)/cost-tracker:$(params.tag)
+        - name: dockerfile
+          value: services/cost-tracker/Dockerfile
+        - name: context
+          value: .
+
+    - name: scan-cost-tracker
+      taskRef:
+        name: trivy-scan
+      runAfter:
+        - build-cost-tracker
+      params:
+        - name: image-name
+          value: $(params.registry)/cost-tracker:$(params.tag)
+
+    # Build frontend
+    - name: build-frontend
+      taskRef:
+        name: build-image
+      runAfter:
+        - git-clone
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+        - name: docker-config
+          workspace: docker-config
+      params:
+        - name: image-name
+          value: $(params.registry)/frontend:$(params.tag)
+        - name: dockerfile
+          value: frontend/Dockerfile
+        - name: context
+          value: .
+
+    - name: scan-frontend
+      taskRef:
+        name: trivy-scan
+      runAfter:
+        - build-frontend
+      params:
+        - name: image-name
+          value: $(params.registry)/frontend:$(params.tag)
+
+    # Deploy all to staging after all scans pass
+    - name: deploy-staging
+      taskRef:
+        name: deploy
+      runAfter:
+        - scan-gateway
+        - scan-agent-engine
+        - scan-document-service
+        - scan-cache-service
+        - scan-cost-tracker
+        - scan-frontend
+      params:
+        - name: app-name
+          value: agent-platform
+        - name: revision
+          value: $(params.tag)
+        - name: argocd-server
+          value: argocd-server.argocd.svc.cluster.local
+
+    # Integration tests against staging
+    - name: integration-test
+      taskRef:
+        name: test
+      runAfter:
+        - deploy-staging
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      params:
+        - name: service-name
+          value: gateway
+
+    # Deploy to production after integration tests pass
+    - name: deploy-prod
+      taskRef:
+        name: deploy
+      runAfter:
+        - integration-test
+      params:
+        - name: app-name
+          value: agent-platform
+        - name: revision
+          value: $(params.tag)
+        - name: argocd-server
+          value: argocd-server.argocd.svc.cluster.local
