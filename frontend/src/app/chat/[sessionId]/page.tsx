@@ -1,18 +1,14 @@
 "use client";
 
-import { use } from "react";
+import { useParams } from "next/navigation";
 import { ChatWindow } from "@/components/chat/ChatWindow";
 
-export default function ChatSessionPage({
-  params,
-}: {
-  params: Promise<{ sessionId: string }>;
-}) {
-  const { sessionId } = use(params);
+export default function ChatSessionPage() {
+  const params = useParams<{ sessionId: string }>();
 
   return (
     <div className="h-full">
-      <ChatWindow sessionId={sessionId} />
+      <ChatWindow sessionId={params.sessionId} />
     </div>
   );
 }

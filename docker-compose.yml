@@ -1,0 +1,293 @@
+# ============================================================================
+# AI Agent Platform -- Complete Standalone Docker Compose
+#
+# Deploy the entire platform with: docker compose up -d
+# Works on: GCP Compute Engine, Azure VM, AWS EC2, any Linux with Docker
+#
+# For GPU (Ollama): Requires NVIDIA Container Toolkit installed on host
+#   GCP: Use N1/A2 instances with NVIDIA T4/A100
+#   Azure: Use NC-series VMs (NC6s_v3 for T4, NC24ads_A100)
+#
+# Port Map:
+#   Frontend:     8055 -> 3000  (Web UI)
+#   Gateway:      8050 -> 8000  (GraphQL API + /metrics + /k8s)
+#   Agent Engine: 8053 -> 8003  (LLM agent orchestration)
+#   Doc Service:  8051 -> 8001  (RAG pipeline)
+#   Cache Service:8052 -> 8002  (Semantic cache)
+#   Cost Tracker: 8054 -> 8004  ($/inference tracking)
+#   Postgres:     5432          (pgvector)
+#   Redis:        6379          (VSS semantic cache)
+#   MinIO API:    9000          (S3-compatible object store)
+#   MinIO UI:     9001          (MinIO console)
+#   Ollama:       11434         (LLM inference)
+# ============================================================================
+
+services:
+  # ══════════════════════════════════════════════════════════════════════
+  # INFRASTRUCTURE
+  # ══════════════════════════════════════════════════════════════════════
+
+  postgres:
+    container_name: aiadopt-postgres
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: agent_platform
+      POSTGRES_USER: agent_platform
+      POSTGRES_PASSWORD: agent_platform
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agent_platform"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-net
+
+  redis:
+    container_name: aiadopt-redis
+    image: redis/redis-stack:7.2.0-v10
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+      - "${REDIS_UI_PORT:-8001}:8001"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-net
+
+  minio:
+    container_name: aiadopt-minio
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_UI_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - app-net
+
+  ollama:
+    container_name: aiadopt-ollama
+    image: ollama/ollama:0.11.0
+    restart: unless-stopped
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      - app-net
+
+  # Pull the model on first start
+  ollama-init:
+    container_name: aiadopt-ollama-init
+    image: ollama/ollama:0.11.0
+    restart: "no"
+    entrypoint: >
+      sh -c "sleep 5 && ollama pull qwen2.5:1.5b && echo 'Model ready!'"
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    depends_on:
+      ollama:
+        condition: service_started
+    networks:
+      - app-net
+
+  # ══════════════════════════════════════════════════════════════════════
+  # APPLICATION SERVICES
+  # ══════════════════════════════════════════════════════════════════════
+
+  gateway:
+    container_name: aiadopt-gateway
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${GATEWAY_PORT:-8050}:8000"
+    environment:
+      SERVICE_NAME: gateway
+      DEBUG: "${DEBUG:-false}"
+      DATABASE_URL: postgresql://agent_platform:agent_platform@postgres:5432/agent_platform
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      LLM_PRIMARY_URL: http://ollama:11434/v1
+      LLM_FALLBACK_URL: http://ollama:11434/v1
+      LLM_MODEL: ${LLM_MODEL:-qwen2.5:1.5b}
+      AGENT_ENGINE_URL: http://agent-engine:8003
+      DOCUMENT_SERVICE_URL: http://document-service:8001
+      CACHE_SERVICE_URL: http://cache-service:8002
+      COST_TRACKER_URL: http://cost-tracker:8004
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - app-net
+
+  agent-engine:
+    container_name: aiadopt-agent-engine
+    build:
+      context: .
+      dockerfile: services/agent-engine/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${AGENT_ENGINE_PORT:-8053}:8003"
+    environment:
+      SERVICE_NAME: agent-engine
+      LLM_PRIMARY_URL: http://ollama:11434/v1
+      LLM_FALLBACK_URL: http://ollama:11434/v1
+      LLM_MODEL: ${LLM_MODEL:-qwen2.5:1.5b}
+      DATABASE_URL: postgresql://agent_platform:agent_platform@postgres:5432/agent_platform
+      REDIS_URL: redis://redis:6379/0
+      DOCUMENT_SERVICE_URL: http://document-service:8001
+      CACHE_SERVICE_URL: http://cache-service:8002
+      PREFECT_API_URL: ""
+      PREFECT_HOME: /tmp/prefect
+    depends_on:
+      ollama:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/healthz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - app-net
+
+  document-service:
+    container_name: aiadopt-document-service
+    build:
+      context: .
+      dockerfile: services/document-service/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${DOC_SERVICE_PORT:-8051}:8001"
+    environment:
+      SERVICE_NAME: document-service
+      DATABASE_URL: postgresql://agent_platform:agent_platform@postgres:5432/agent_platform
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/healthz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - app-net
+
+  cache-service:
+    container_name: aiadopt-cache-service
+    build:
+      context: .
+      dockerfile: services/cache-service/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${CACHE_SERVICE_PORT:-8052}:8002"
+    environment:
+      SERVICE_NAME: cache-service
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/healthz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - app-net
+
+  cost-tracker:
+    container_name: aiadopt-cost-tracker
+    build:
+      context: .
+      dockerfile: services/cost-tracker/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${COST_TRACKER_PORT:-8054}:8004"
+    environment:
+      SERVICE_NAME: cost-tracker
+      DATABASE_URL: postgresql://agent_platform:agent_platform@postgres:5432/agent_platform
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/healthz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - app-net
+
+  frontend:
+    container_name: aiadopt-frontend
+    build:
+      context: frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_GRAPHQL_URL: ${NEXT_PUBLIC_GRAPHQL_URL:-http://localhost:8050/graphql}
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-8055}:3000"
+    environment:
+      NODE_ENV: production
+    depends_on:
+      gateway:
+        condition: service_healthy
+    networks:
+      - app-net
+
+# ══════════════════════════════════════════════════════════════════════
+# VOLUMES & NETWORKS
+# ══════════════════════════════════════════════════════════════════════
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:
+  ollama-models:
+
+networks:
+  app-net:
+    name: aiadopt-net
+    driver: bridge

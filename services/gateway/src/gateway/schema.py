@@ -60,7 +60,7 @@ class ChatMessage:
     content: str
     tool_calls: list[ToolCall] | None = None
     cost_usd: float | None = None
-    latency_ms: int | None = None
+    latency_ms: float | None = None
     created_at: datetime
 
 

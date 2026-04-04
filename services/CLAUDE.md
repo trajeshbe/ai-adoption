@@ -5,13 +5,13 @@ Five Python microservices, each with its own pyproject.toml, Dockerfile, and tes
 All share `libs/py-common` for config, logging, telemetry, and error handling.
 
 ## Services
-| Service           | Port | Purpose                              |
-|-------------------|------|--------------------------------------|
-| gateway           | 8000 | FastAPI + Strawberry GraphQL API     |
-| agent-engine      | 8003 | Prefect + LangGraph agent execution  |
-| document-service  | 8001 | Document ingestion + RAG retrieval   |
-| cache-service     | 8002 | Redis VSS semantic cache             |
-| cost-tracker      | 8004 | OpenCost aggregation + $/inference   |
+| Service           | Dev Port | K8s Port | Purpose                              |
+|-------------------|----------|----------|--------------------------------------|
+| gateway           | 8050     | 8000     | FastAPI + Strawberry GraphQL + /metrics + /k8s |
+| agent-engine      | 8053     | 8003     | Prefect + LangGraph agent execution  |
+| document-service  | 8051     | 8001     | Document ingestion + RAG retrieval   |
+| cache-service     | 8052     | 8002     | Redis VSS semantic cache             |
+| cost-tracker      | 8054     | 8004     | OpenCost aggregation + $/inference   |
 
 ## Conventions
 - Every service uses FastAPI with the app factory pattern (`create_app()`)

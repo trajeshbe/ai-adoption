@@ -1,7 +1,7 @@
 "use client";
 
-import { use } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { ArrowLeft, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,12 +14,8 @@ import {
 } from "@/components/ui/card";
 import { useAgents } from "@/lib/hooks/useAgents";
 
-export default function AgentDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = use(params);
+export default function AgentDetailPage() {
+  const { id } = useParams<{ id: string }>();
   const { agents, loading } = useAgents();
   const agent = agents.find((a) => a.id === id);
 

@@ -9,11 +9,13 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/", label: "Dashboard" },
+  { href: "/chat", label: "Chat" },
   { href: "/agents", label: "Agents" },
   { href: "/documents", label: "Documents" },
   { href: "/workflows", label: "Workflows" },
   { href: "/costs", label: "Costs" },
   { href: "/observability", label: "Observability" },
+  { href: "/scaling", label: "Scaling" },
 ];
 
 export function Navbar() {
@@ -37,7 +39,7 @@ export function Navbar() {
               href={item.href}
               className={cn(
                 "rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground",
-                pathname === item.href
+                (item.label === "Chat" ? pathname.startsWith("/chat") : pathname === item.href)
                   ? "bg-accent text-accent-foreground"
                   : "text-muted-foreground"
               )}
@@ -66,7 +68,7 @@ export function Navbar() {
               onClick={() => setMobileOpen(false)}
               className={cn(
                 "block rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent",
-                pathname === item.href
+                (item.label === "Chat" ? pathname.startsWith("/chat") : pathname === item.href)
                   ? "bg-accent text-accent-foreground"
                   : "text-muted-foreground"
               )}

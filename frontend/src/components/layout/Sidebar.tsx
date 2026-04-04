@@ -10,16 +10,19 @@ import {
   GitBranch,
   DollarSign,
   Activity,
+  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const sidebarItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/chat", label: "Chat", icon: MessageSquare },
   { href: "/agents", label: "Agents", icon: Bot },
   { href: "/documents", label: "Documents", icon: FileText },
   { href: "/workflows", label: "Workflows", icon: GitBranch },
   { href: "/costs", label: "Costs", icon: DollarSign },
   { href: "/observability", label: "Observability", icon: Activity },
+  { href: "/scaling", label: "Scaling", icon: BarChart3 },
 ];
 
 export function Sidebar() {
@@ -34,7 +37,9 @@ export function Sidebar() {
             const isActive =
               item.href === "/"
                 ? pathname === "/"
-                : pathname.startsWith(item.href);
+                : item.label === "Chat"
+                  ? pathname.startsWith("/chat")
+                  : pathname.startsWith(item.href);
 
             return (
               <Link

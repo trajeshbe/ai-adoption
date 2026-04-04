@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: agent-platform
+  labels:
+    app: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: python:3.11-slim
+          command: ["python", "-c"]
+          args:
+            - |
+              from http.server import HTTPServer, BaseHTTPRequestHandler
+              import urllib.request, os
+              HOST = os.environ.get("UPSTREAM_HOST", "192.168.49.1")
+              PORT = os.environ.get("UPSTREAM_PORT", "8055")
+              class Proxy(BaseHTTPRequestHandler):
+                  def do_GET(self):
+                      try:
+                          r = urllib.request.urlopen(f"http://{HOST}:{PORT}{self.path}", timeout=10)
+                          data = r.read()
+                          self.send_response(r.status)
+                          for h in ["Content-Type", "Content-Encoding", "Cache-Control"]:
+                              v = r.headers.get(h)
+                              if v: self.send_header(h, v)
+                          self.end_headers()
+                          self.wfile.write(data)
+                      except Exception as e:
+                          self.send_response(502)
+                          self.end_headers()
+                          self.wfile.write(str(e).encode())
+                  def log_message(self, format, *args): pass
+              print(f"Frontend proxy on :3000 -> {HOST}:{PORT}")
+              HTTPServer(("0.0.0.0", 3000), Proxy).serve_forever()
+          ports:
+            - containerPort: 3000
+          env:
+            - name: UPSTREAM_HOST
+              value: "192.168.49.1"
+            - name: UPSTREAM_PORT
+              value: "8055"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: agent-platform
+spec:
+  selector:
+    app: frontend
+  ports:
+    - port: 3000
+      targetPort: 3000
