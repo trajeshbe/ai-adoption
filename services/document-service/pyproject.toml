@@ -1,9 +1,26 @@
 [project]
 name = "agent-platform-document-service"
 version = "0.1.0"
-description = "Agent Platform document-service service (Phase 3-4)"
+description = "Document ingestion + RAG retrieval with pgvector"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "agent-platform-common",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "sqlalchemy[asyncio]>=2.0.0",
+    "asyncpg>=0.29.0",
+    "pgvector>=0.3.0",
+    "alembic>=1.13.0",
+    "minio>=7.2.0",
+    "httpx>=0.27.0",
+    "python-multipart>=0.0.9",
+]
+
+[tool.uv.sources]
+agent-platform-common = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/document_service"]
 
 [build-system]
 requires = ["hatchling"]
