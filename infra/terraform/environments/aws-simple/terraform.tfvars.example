@@ -1,0 +1,4 @@
+# Copy to terraform.tfvars and fill in values
+region         = "us-east-1"
+domain         = "app.example.com"
+ssh_public_key = "ssh-ed25519 AAAA..."

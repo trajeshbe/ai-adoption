@@ -1,0 +1,14 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: agent-platform-tls
+  namespace: agent-platform
+spec:
+  # This secret name matches the TLS reference in contour-httpproxy.yaml.
+  secretName: agent-platform-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  # Replace with your real domain(s). Supports multiple SANs.
+  dnsNames:
+    - app.example.com

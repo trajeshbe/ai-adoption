@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   packages: write
+  id-token: write  # Required for OIDC federation with cloud providers
 
 jobs:
   build-and-push:
@@ -28,6 +29,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Extract version
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      # ── GHCR (always) ──────────────────────────────────────────────
       - name: Login to GHCR
         uses: docker/login-action@v3
         with:
@@ -35,17 +41,89 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract version
-        id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      # ── GCP Artifact Registry (optional) ────────────────────────────
+      - name: Authenticate to GCP
+        if: vars.GCP_PROJECT_ID != ''
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Login to GCP Artifact Registry
+        if: vars.GCP_PROJECT_ID != ''
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ vars.GCP_REGION || 'us-central1' }}-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      # ── AWS ECR (optional) ──────────────────────────────────────────
+      - name: Configure AWS credentials
+        if: vars.AWS_ACCOUNT_ID != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Login to AWS ECR
+        if: vars.AWS_ACCOUNT_ID != ''
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # ── Azure ACR (optional) ────────────────────────────────────────
+      - name: Login to Azure ACR
+        if: vars.AZURE_ACR_NAME != ''
+        uses: azure/docker-login@v2
+        with:
+          login-server: ${{ vars.AZURE_ACR_NAME }}.azurecr.io
+          username: ${{ secrets.AZURE_ACR_USERNAME }}
+          password: ${{ secrets.AZURE_ACR_PASSWORD }}
+
+      # ── Build context ───────────────────────────────────────────────
+      - name: Determine build context
+        id: context
+        run: |
+          if [ "${{ matrix.service }}" = "frontend" ]; then
+            echo "dir=frontend" >> $GITHUB_OUTPUT
+          else
+            echo "dir=." >> $GITHUB_OUTPUT
+            echo "file=services/${{ matrix.service }}/Dockerfile" >> $GITHUB_OUTPUT
+          fi
+
+      # ── Build & Push to all registries ──────────────────────────────
+      - name: Build image tags
+        id: tags
+        run: |
+          TAGS="ghcr.io/${{ github.repository }}/${{ matrix.service }}:${{ steps.version.outputs.VERSION }}"
+          TAGS="${TAGS},ghcr.io/${{ github.repository }}/${{ matrix.service }}:latest"
+
+          # GCP
+          if [ -n "${{ vars.GCP_PROJECT_ID }}" ]; then
+            GCP_REGION="${{ vars.GCP_REGION || 'us-central1' }}"
+            TAGS="${TAGS},${GCP_REGION}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/agent-platform/${{ matrix.service }}:${{ steps.version.outputs.VERSION }}"
+            TAGS="${TAGS},${GCP_REGION}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/agent-platform/${{ matrix.service }}:latest"
+          fi
+
+          # AWS
+          if [ -n "${{ vars.AWS_ACCOUNT_ID }}" ]; then
+            AWS_REGION="${{ vars.AWS_REGION || 'us-east-1' }}"
+            TAGS="${TAGS},${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${AWS_REGION}.amazonaws.com/agent-platform/${{ matrix.service }}:${{ steps.version.outputs.VERSION }}"
+            TAGS="${TAGS},${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${AWS_REGION}.amazonaws.com/agent-platform/${{ matrix.service }}:latest"
+          fi
+
+          # Azure
+          if [ -n "${{ vars.AZURE_ACR_NAME }}" ]; then
+            TAGS="${TAGS},${{ vars.AZURE_ACR_NAME }}.azurecr.io/${{ matrix.service }}:${{ steps.version.outputs.VERSION }}"
+            TAGS="${TAGS},${{ vars.AZURE_ACR_NAME }}.azurecr.io/${{ matrix.service }}:latest"
+          fi
+
+          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
 
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: ${{ matrix.service == 'frontend' && 'frontend' || format('services/{0}', matrix.service) }}
+          context: ${{ steps.context.outputs.dir }}
+          file: ${{ steps.context.outputs.file || '' }}
           push: true
-          tags: |
-            ghcr.io/${{ github.repository }}/${{ matrix.service }}:${{ steps.version.outputs.VERSION }}
-            ghcr.io/${{ github.repository }}/${{ matrix.service }}:latest
+          tags: ${{ steps.tags.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

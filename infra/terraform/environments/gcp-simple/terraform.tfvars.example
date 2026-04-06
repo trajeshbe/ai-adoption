@@ -1,0 +1,6 @@
+# Copy to terraform.tfvars and fill in values
+project        = "my-gcp-project-id"
+region         = "us-central1"
+zone           = "us-central1-a"
+domain         = "app.example.com"
+ssh_public_key = "ssh-ed25519 AAAA..."

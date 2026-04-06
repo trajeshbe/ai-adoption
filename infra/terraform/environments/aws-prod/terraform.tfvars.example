@@ -1,0 +1,4 @@
+# Copy to terraform.tfvars and fill in values
+region      = "us-east-1"
+domain      = "app.example.com"
+db_password = "CHANGE_ME_secure_password_here"

@@ -1,0 +1,31 @@
+# Caddy reverse proxy for AI Agent Platform
+# Provides automatic HTTPS via Let's Encrypt
+#
+# Usage:
+#   1. Set SITE_DOMAIN in .env (e.g., SITE_DOMAIN=app.example.com)
+#   2. Point DNS A record to your server's public IP
+#   3. docker compose --profile web up -d
+#
+# For local/IP-only access (no TLS):
+#   Set SITE_DOMAIN=:80 to disable HTTPS
+
+{$SITE_DOMAIN:localhost} {
+	# GraphQL API + health/metrics endpoints
+	handle /graphql* {
+		reverse_proxy gateway:8000
+	}
+	handle /healthz {
+		reverse_proxy gateway:8000
+	}
+	handle /readyz {
+		reverse_proxy gateway:8000
+	}
+	handle /metrics* {
+		reverse_proxy gateway:8000
+	}
+
+	# Frontend (Next.js)
+	handle {
+		reverse_proxy frontend:3000
+	}
+}

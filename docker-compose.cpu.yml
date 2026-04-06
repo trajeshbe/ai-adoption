@@ -1,0 +1,9 @@
+# CPU-only override for Ollama (no NVIDIA driver required)
+#
+# Usage: docker compose -f docker-compose.yml -f docker-compose.cpu.yml up -d --build
+# Cloud: docker compose -f docker-compose.yml -f docker-compose.cpu.yml --profile web up -d --build
+
+services:
+  ollama:
+    deploy:
+      resources: {}

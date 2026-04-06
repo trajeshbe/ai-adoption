@@ -1,0 +1,5 @@
+# Copy to terraform.tfvars and fill in values
+location    = "eastus"
+domain      = "app.example.com"
+db_password = "CHANGE_ME_secure_password_here"
+acr_name    = "myagentplatformacr"

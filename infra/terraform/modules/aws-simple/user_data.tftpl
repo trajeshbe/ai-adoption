@@ -1,0 +1,52 @@
+#!/bin/bash
+set -euxo pipefail
+
+# Log all output for debugging via: sudo cat /var/log/cloud-init-output.log
+exec > >(tee /var/log/agent-platform-setup.log) 2>&1
+
+echo "=== Agent Platform Setup Starting ==="
+
+# ----------------------------------------------------------------------------
+# Install Docker Engine + Compose Plugin
+# ----------------------------------------------------------------------------
+apt-get update -y
+apt-get install -y ca-certificates curl gnupg lsb-release git
+
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+chmod a+r /etc/apt/keyrings/docker.gpg
+
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+  https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" \
+  > /etc/apt/sources.list.d/docker.list
+
+apt-get update -y
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+systemctl enable docker
+systemctl start docker
+usermod -aG docker ubuntu
+
+# ----------------------------------------------------------------------------
+# Clone repository and configure environment
+# ----------------------------------------------------------------------------
+cd /opt
+git clone ${repo_url} ai-adoption
+cd ai-adoption
+
+cat > .env <<'ENVEOF'
+SITE_DOMAIN=${domain}
+NEXT_PUBLIC_GRAPHQL_URL=https://${domain}/graphql
+POSTGRES_DB=agent_platform
+POSTGRES_USER=agent_platform
+POSTGRES_PASSWORD=agent_platform
+ENVEOF
+
+# ----------------------------------------------------------------------------
+# Start all services (CPU mode + Caddy reverse proxy for TLS)
+# ----------------------------------------------------------------------------
+docker compose -f docker-compose.yml -f docker-compose.cpu.yml --profile web up -d --build
+
+echo "=== Agent Platform Setup Complete ==="
+echo "Frontend: https://${domain}"
+echo "GraphQL:  https://${domain}/graphql"

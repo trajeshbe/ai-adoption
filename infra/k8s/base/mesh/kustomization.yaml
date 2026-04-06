@@ -8,3 +8,5 @@ resources:
   - virtual-service-canary.yaml
   - destination-rules.yaml
   - network-policies.yaml
+  - cert-manager-issuer.yaml
+  - certificate.yaml

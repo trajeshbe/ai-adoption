@@ -20,6 +20,18 @@
 #   MinIO API:    9000          (S3-compatible object store)
 #   MinIO UI:     9001          (MinIO console)
 #   Ollama:       11434         (LLM inference)
+#   Caddy:        80/443        (Reverse proxy + auto-TLS, --profile web)
+#
+# Profiles:
+#   --profile web  Adds Caddy reverse proxy with auto-HTTPS
+#
+# CPU-only (no NVIDIA driver):
+#   docker compose -f docker-compose.yml -f docker-compose.cpu.yml up -d --build
+#
+# Cloud deploy (CPU + HTTPS):
+#   1. Set in .env:  SITE_DOMAIN=app.example.com
+#                    NEXT_PUBLIC_GRAPHQL_URL=https://app.example.com/graphql
+#   2. docker compose -f docker-compose.yml -f docker-compose.cpu.yml --profile web up -d --build
 # ============================================================================
 
 services:
@@ -80,6 +92,9 @@ services:
     networks:
       - app-net
 
+  # Ollama LLM inference
+  # GPU mode (default): requires NVIDIA Container Toolkit
+  # CPU mode: docker compose -f docker-compose.yml -f docker-compose.cpu.yml up -d
   ollama:
     container_name: aiadopt-ollama
     image: ollama/ollama:0.11.0
@@ -277,6 +292,33 @@ services:
     networks:
       - app-net
 
+  # ══════════════════════════════════════════════════════════════════════
+  # REVERSE PROXY (activate with --profile web)
+  # ══════════════════════════════════════════════════════════════════════
+
+  caddy:
+    container_name: aiadopt-caddy
+    image: caddy:2-alpine
+    restart: unless-stopped
+    profiles: ["web"]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      frontend:
+        condition: service_started
+      gateway:
+        condition: service_healthy
+    networks:
+      - app-net
+
 # ══════════════════════════════════════════════════════════════════════
 # VOLUMES & NETWORKS
 # ══════════════════════════════════════════════════════════════════════
@@ -286,6 +328,8 @@ volumes:
   redis-data:
   minio-data:
   ollama-models:
+  caddy-data:
+  caddy-config:
 
 networks:
   app-net:
