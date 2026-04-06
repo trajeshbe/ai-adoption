@@ -184,6 +184,7 @@ services:
       CACHE_SERVICE_URL: http://cache-service:8002
       PREFECT_API_URL: ""
       PREFECT_HOME: /tmp/prefect
+      PREFECT_MEMO_STORE_PATH: /tmp/prefect/memo_store.toml
     depends_on:
       ollama:
         condition: service_started

@@ -66,14 +66,52 @@ async def run_agent_graph(
     return response
 
 
+async def _direct_execute(
+    agent_type: str,
+    user_message: str,
+    history: list[dict],
+    settings: Settings,
+) -> AgentResponse:
+    """Execute agent directly via LangGraph (no Prefect orchestration)."""
+    llm_client = LLMClient(
+        primary_url=settings.llm_primary_url,
+        fallback_url=settings.llm_fallback_url,
+        model=settings.llm_model,
+    )
+    http_client: httpx.AsyncClient | None = None
+    if agent_type.upper() == "RAG":
+        http_client = httpx.AsyncClient(
+            base_url=settings.document_service_url,
+            timeout=30.0,
+        )
+    try:
+        agent = AgentRegistry.create(agent_type, llm_client, http_client)
+        graph = build_agent_graph(agent)
+        result = await graph.ainvoke({
+            "user_message": user_message,
+            "history": history,
+        })
+        response: AgentResponse | None = result.get("final_response")
+        if response is None:
+            return AgentResponse(content="Agent did not produce a response.")
+        accumulated_tools = result.get("tool_calls", [])
+        if accumulated_tools and not response.tool_calls:
+            response.tool_calls = accumulated_tools
+        return response
+    finally:
+        await llm_client.close()
+        if http_client is not None:
+            await http_client.aclose()
+
+
 @flow(name="agent-execution", timeout_seconds=120)
-async def agent_flow(
+async def _prefect_agent_flow(
     agent_type: str,
     user_message: str,
     history: list[dict] | None = None,
     settings: Settings | None = None,
 ) -> AgentResponse:
-    """Orchestrate a single agent execution turn.
+    """Orchestrate a single agent execution turn via Prefect.
 
     1. Create LLM client and HTTP client
     2. Instantiate the requested agent from the registry
@@ -84,12 +122,6 @@ async def agent_flow(
         settings = Settings(service_name="agent-engine")
     if history is None:
         history = []
-
-    await logger.ainfo(
-        "agent_flow_started",
-        agent_type=agent_type,
-        message_length=len(user_message),
-    )
 
     llm_client = create_llm_client(settings)
 
@@ -119,3 +151,36 @@ async def agent_flow(
         await llm_client.close()
         if http_client is not None:
             await http_client.aclose()
+
+
+async def agent_flow(
+    agent_type: str,
+    user_message: str,
+    history: list[dict] | None = None,
+    settings: Settings | None = None,
+) -> AgentResponse:
+    """Execute agent with Prefect orchestration, falling back to direct execution."""
+    if settings is None:
+        settings = Settings(service_name="agent-engine")
+    if history is None:
+        history = []
+
+    await logger.ainfo(
+        "agent_flow_started",
+        agent_type=agent_type,
+        message_length=len(user_message),
+    )
+
+    try:
+        return await _prefect_agent_flow(
+            agent_type=agent_type,
+            user_message=user_message,
+            history=history,
+            settings=settings,
+        )
+    except Exception as prefect_err:
+        await logger.awarning(
+            "prefect_flow_failed_falling_back_to_direct",
+            error=str(prefect_err),
+        )
+        return await _direct_execute(agent_type, user_message, history, settings)

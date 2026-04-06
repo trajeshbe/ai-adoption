@@ -20,7 +20,8 @@ RUN uv pip install --system --no-cache /libs/py-common && \
 EXPOSE 8003
 
 # Non-root user for security
-RUN useradd --create-home --shell /bin/bash appuser
+RUN useradd --create-home --shell /bin/bash appuser && \
+    mkdir -p /tmp/prefect && chown appuser:appuser /tmp/prefect
 USER appuser
 
 CMD ["uvicorn", "agent_engine.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8003"]
