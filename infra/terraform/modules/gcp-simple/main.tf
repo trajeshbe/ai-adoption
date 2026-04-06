@@ -164,14 +164,25 @@ resource "google_compute_instance" "ai_platform" {
     ENV
 
     # -----------------------------------------------------------------------
-    # 4. Start the platform
+    # 4. Strip GPU config (CPU-only VM)
+    # -----------------------------------------------------------------------
+    echo "Removing GPU reservation from docker-compose.yml (CPU-only VM)..."
+    python3 -c "
+import re
+with open('docker-compose.yml') as f:
+    content = f.read()
+# Remove the deploy block from ollama service
+content = re.sub(r'    deploy:\n      resources:\n        reservations:\n          devices:\n            - driver: nvidia\n              count: all\n              capabilities: \[gpu\]\n', '', content)
+with open('docker-compose.yml', 'w') as f:
+    f.write(content)
+print('GPU reservation removed')
+"
+
+    # -----------------------------------------------------------------------
+    # 5. Start the platform
     # -----------------------------------------------------------------------
     echo "Starting AI Agent Platform via docker compose..."
-    docker compose \
-      -f docker-compose.yml \
-      -f docker-compose.cpu.yml \
-      --profile web \
-      up -d --build
+    docker compose --profile web up -d --build
 
     echo "=== Startup complete at: $(date -u) ==="
   SCRIPT

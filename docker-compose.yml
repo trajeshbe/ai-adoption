@@ -25,13 +25,11 @@
 # Profiles:
 #   --profile web  Adds Caddy reverse proxy with auto-HTTPS
 #
-# CPU-only (no NVIDIA driver):
-#   docker compose -f docker-compose.yml -f docker-compose.cpu.yml up -d --build
-#
 # Cloud deploy (CPU + HTTPS):
 #   1. Set in .env:  SITE_DOMAIN=app.example.com
 #                    NEXT_PUBLIC_GRAPHQL_URL=https://app.example.com/graphql
-#   2. docker compose -f docker-compose.yml -f docker-compose.cpu.yml --profile web up -d --build
+#   2. The Terraform startup script auto-strips GPU config on CPU-only VMs
+#   3. docker compose --profile web up -d --build
 # ============================================================================
 
 services:
@@ -92,9 +90,8 @@ services:
     networks:
       - app-net
 
-  # Ollama LLM inference
-  # GPU mode (default): requires NVIDIA Container Toolkit
-  # CPU mode: docker compose -f docker-compose.yml -f docker-compose.cpu.yml up -d
+  # Ollama LLM inference (GPU by default for local dev)
+  # Cloud/CPU-only VMs: the Terraform startup script strips the deploy block
   ollama:
     container_name: aiadopt-ollama
     image: ollama/ollama:0.11.0
