@@ -7,18 +7,15 @@ FROM python:3.11-slim AS base
 WORKDIR /app
 RUN pip install --no-cache-dir uv
 
-# ── Dependencies layer (cached unless pyproject.toml changes) ──────────
+# ── Dependencies layer ────────────────────────────────────────────────
 FROM base AS deps
 COPY libs/py-common/pyproject.toml /libs/py-common/pyproject.toml
 COPY libs/py-common/src /libs/py-common/src
 COPY services/agent-engine/pyproject.toml .
+COPY services/agent-engine/src ./src
 RUN uv pip install --system --no-cache /libs/py-common && \
     sed -i '/\[tool.uv.sources\]/,/^$/d' pyproject.toml && \
-    uv pip install --system --no-cache -e .
-
-# ── Runtime layer ──────────────────────────────────────────────────────
-FROM deps AS runtime
-COPY services/agent-engine/src ./src
+    uv pip install --system --no-cache .
 
 EXPOSE 8003
 
