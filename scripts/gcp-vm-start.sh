@@ -26,30 +26,32 @@ TARGET="${1:-all}"
 # ── Start a VM ───────────────────────────────────────────────────────────────
 start_vm() {
   local vm="$1" zone="$2" label="$3"
-  log "Starting $label VM ($vm in $zone)..."
+  log "Starting $label VM ($vm in $zone)..." >&2
 
   STATUS=$(gcloud compute instances describe "$vm" \
     --project="$PROJECT" --zone="$zone" \
     --format="value(status)" 2>/dev/null || echo "NOT_FOUND")
 
   if [ "$STATUS" = "RUNNING" ]; then
-    log "$label VM is already running"
+    log "$label VM is already running" >&2
   elif [ "$STATUS" = "NOT_FOUND" ]; then
-    err "$label VM not found. Create it first."
+    err "$label VM not found. Create it first." >&2
     return 1
   else
-    gcloud compute instances start "$vm" \
-      --project="$PROJECT" --zone="$zone" --quiet
-    log "$label VM started. Waiting for SSH..."
+    if ! gcloud compute instances start "$vm" \
+      --project="$PROJECT" --zone="$zone" --quiet 2>&1 >&2; then
+      err "$label VM failed to start (GPU resources may be exhausted in $zone)." >&2
+      err "Try again later or recreate in a different zone." >&2
+      return 1
+    fi
+    log "$label VM started. Waiting for SSH..." >&2
     sleep 15
   fi
 
-  # Get external IP
-  local ip
-  ip=$(gcloud compute instances describe "$vm" \
+  # Get external IP (only stdout output from this function)
+  gcloud compute instances describe "$vm" \
     --project="$PROJECT" --zone="$zone" \
-    --format="value(networkInterfaces[0].accessConfigs[0].natIP)")
-  echo "$ip"
+    --format="value(networkInterfaces[0].accessConfigs[0].natIP)"
 }
 
 # ── Start services on a VM ───────────────────────────────────────────────────
