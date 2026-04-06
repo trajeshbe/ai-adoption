@@ -13,7 +13,7 @@ COPY libs/py-common/pyproject.toml /libs/py-common/pyproject.toml
 COPY libs/py-common/src /libs/py-common/src
 COPY services/gateway/pyproject.toml .
 RUN uv pip install --system --no-cache /libs/py-common && \
-    sed -i '/\[tool.uv.sources\]/,/^\[/d' pyproject.toml && \
+    sed -i '/\[tool.uv.sources\]/,/^$/d' pyproject.toml && \
     uv pip install --system --no-cache -e .
 
 # ── Runtime layer ──────────────────────────────────────────────────────
