@@ -9,7 +9,9 @@
 # For local/IP-only access (no TLS):
 #   Set SITE_DOMAIN=:80 to disable HTTPS
 
-{$SITE_DOMAIN:localhost} {
+# When behind Cloudflare proxy, serve HTTP only (Cloudflare handles TLS)
+# For direct TLS (no Cloudflare), use: {$SITE_DOMAIN:localhost}
+:80 {
 	# GraphQL API + health/metrics endpoints
 	handle /graphql* {
 		reverse_proxy gateway:8000
