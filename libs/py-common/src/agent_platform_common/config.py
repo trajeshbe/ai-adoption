@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     llm_primary_url: str = "http://localhost:11434/v1"
     llm_fallback_url: str = "http://localhost:8080/v1"
     llm_model: str = "llama3.1:8b"
+    openai_api_key: str = ""  # Set to enable OpenAI as LLM provider
 
     # ── Observability ──────────────────────────────────────────────────
     otel_exporter_otlp_endpoint: str = "http://localhost:4317"

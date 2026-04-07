@@ -80,7 +80,7 @@ class CircuitBreaker:
 
 
 class LLMClient:
-    """Unified LLM client targeting OpenAI-compatible endpoints (vLLM / llama.cpp).
+    """Unified LLM client targeting OpenAI-compatible endpoints (vLLM / llama.cpp / OpenAI).
 
     Tries the primary endpoint first. On failure, consults the circuit breaker
     to decide whether to fall back to the secondary endpoint.
@@ -92,11 +92,39 @@ class LLMClient:
         fallback_url: str,
         model: str,
         timeout: float = 60.0,
+        api_key: str = "not-needed",
     ) -> None:
         self.model = model
-        self._primary = AsyncOpenAI(base_url=primary_url, api_key="not-needed", timeout=timeout)
-        self._fallback = AsyncOpenAI(base_url=fallback_url, api_key="not-needed", timeout=timeout)
+        self._primary = AsyncOpenAI(base_url=primary_url, api_key=api_key, timeout=timeout)
+        self._fallback = AsyncOpenAI(base_url=fallback_url, api_key=api_key, timeout=timeout)
         self._circuit = CircuitBreaker()
+
+    @classmethod
+    def for_provider(
+        cls,
+        provider: str,
+        model: str,
+        api_key: str = "",
+        fallback_url: str = "http://localhost:8080/v1",
+        default_primary_url: str = "http://localhost:11434/v1",
+    ) -> "LLMClient":
+        """Create an LLMClient for a specific provider.
+
+        Supported providers: "ollama" (default), "openai".
+        """
+        if provider.lower() == "openai":
+            return cls(
+                primary_url="https://api.openai.com/v1",
+                fallback_url=fallback_url,
+                model=model or "gpt-4o-mini",
+                api_key=api_key,
+            )
+        # Default: Ollama / vLLM / llama.cpp
+        return cls(
+            primary_url=default_primary_url,
+            fallback_url=fallback_url,
+            model=model or "qwen2.5:1.5b",
+        )
 
     # ── Public API ────────────────────────────────────────────────────────
 

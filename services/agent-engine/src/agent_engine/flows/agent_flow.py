@@ -66,18 +66,35 @@ async def run_agent_graph(
     return response
 
 
+def _make_llm_client(
+    settings: Settings,
+    llm_override: dict | None = None,
+) -> LLMClient:
+    """Create an LLMClient, using per-request override if provided."""
+    if llm_override and llm_override.get("provider"):
+        return LLMClient.for_provider(
+            provider=llm_override["provider"],
+            model=llm_override.get("model", ""),
+            api_key=llm_override.get("api_key", ""),
+            fallback_url=settings.llm_fallback_url,
+            default_primary_url=settings.llm_primary_url,
+        )
+    return LLMClient(
+        primary_url=settings.llm_primary_url,
+        fallback_url=settings.llm_fallback_url,
+        model=settings.llm_model,
+    )
+
+
 async def _direct_execute(
     agent_type: str,
     user_message: str,
     history: list[dict],
     settings: Settings,
+    llm_override: dict | None = None,
 ) -> AgentResponse:
     """Execute agent directly via LangGraph (no Prefect orchestration)."""
-    llm_client = LLMClient(
-        primary_url=settings.llm_primary_url,
-        fallback_url=settings.llm_fallback_url,
-        model=settings.llm_model,
-    )
+    llm_client = _make_llm_client(settings, llm_override)
     http_client: httpx.AsyncClient | None = None
     if agent_type.upper() == "RAG":
         http_client = httpx.AsyncClient(
@@ -110,6 +127,7 @@ async def _prefect_agent_flow(
     user_message: str,
     history: list[dict] | None = None,
     settings: Settings | None = None,
+    llm_override: dict | None = None,
 ) -> AgentResponse:
     """Orchestrate a single agent execution turn via Prefect.
 
@@ -123,7 +141,7 @@ async def _prefect_agent_flow(
     if history is None:
         history = []
 
-    llm_client = create_llm_client(settings)
+    llm_client = _make_llm_client(settings, llm_override)
 
     http_client: httpx.AsyncClient | None = None
     if agent_type.upper() == "RAG":
@@ -158,6 +176,7 @@ async def agent_flow(
     user_message: str,
     history: list[dict] | None = None,
     settings: Settings | None = None,
+    llm_override: dict | None = None,
 ) -> AgentResponse:
     """Execute agent with Prefect orchestration, falling back to direct execution."""
     if settings is None:
@@ -165,10 +184,12 @@ async def agent_flow(
     if history is None:
         history = []
 
+    provider = llm_override.get("provider", "ollama") if llm_override else "ollama"
     await logger.ainfo(
         "agent_flow_started",
         agent_type=agent_type,
         message_length=len(user_message),
+        llm_provider=provider,
     )
 
     try:
@@ -177,10 +198,11 @@ async def agent_flow(
             user_message=user_message,
             history=history,
             settings=settings,
+            llm_override=llm_override,
         )
     except Exception as prefect_err:
         await logger.awarning(
             "prefect_flow_failed_falling_back_to_direct",
             error=str(prefect_err),
         )
-        return await _direct_execute(agent_type, user_message, history, settings)
+        return await _direct_execute(agent_type, user_message, history, settings, llm_override)

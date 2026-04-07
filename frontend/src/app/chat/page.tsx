@@ -99,6 +99,11 @@ function makeUUID() {
   );
 }
 
+const LLM_PROVIDERS = [
+  { value: "ollama", label: "Ollama (Local)", models: ["qwen2.5:1.5b", "llama3.1:8b", "mistral:7b"] },
+  { value: "openai", label: "OpenAI", models: ["gpt-4o", "gpt-4o-mini", "gpt-4.1-mini", "gpt-3.5-turbo", "o4-mini"] },
+];
+
 export default function ChatPage() {
   const [agentIdx, setAgentIdx] = useState(0);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -107,6 +112,41 @@ export default function ChatPage() {
   const [sessionId, setSessionId] = useState(makeUUID);
   const [showConfig, setShowConfig] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // LLM provider state (persisted in localStorage)
+  const [llmProvider, setLlmProvider] = useState("ollama");
+  const [llmModel, setLlmModel] = useState("qwen2.5:1.5b");
+  const [openaiKey, setOpenaiKey] = useState("");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("llm_provider");
+    const savedModel = localStorage.getItem("llm_model");
+    const savedKey = localStorage.getItem("openai_api_key");
+    if (saved) setLlmProvider(saved);
+    if (savedModel) setLlmModel(savedModel);
+    if (savedKey) setOpenaiKey(savedKey);
+  }, []);
+
+  const handleProviderChange = (provider: string) => {
+    setLlmProvider(provider);
+    localStorage.setItem("llm_provider", provider);
+    const providerDef = LLM_PROVIDERS.find(p => p.value === provider);
+    if (providerDef) {
+      const defaultModel = providerDef.models[0];
+      setLlmModel(defaultModel);
+      localStorage.setItem("llm_model", defaultModel);
+    }
+  };
+
+  const handleModelChange = (model: string) => {
+    setLlmModel(model);
+    localStorage.setItem("llm_model", model);
+  };
+
+  const handleKeyChange = (key: string) => {
+    setOpenaiKey(key);
+    localStorage.setItem("openai_api_key", key);
+  };
 
   const agent = AGENTS[agentIdx];
 
@@ -130,6 +170,10 @@ export default function ChatPage() {
     setLoading(true);
 
     try {
+      const llmConfig = llmProvider !== "ollama"
+        ? { provider: llmProvider, model: llmModel, apiKey: openaiKey }
+        : undefined;
+
       const res = await fetch(GRAPHQL_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -141,7 +185,12 @@ export default function ChatPage() {
             }
           }`,
           variables: {
-            input: { agentId: agent.id, sessionId, content: text },
+            input: {
+              agentId: agent.id,
+              sessionId,
+              content: text,
+              ...(llmConfig && { llmConfig }),
+            },
           },
         }),
       });
@@ -294,16 +343,79 @@ export default function ChatPage() {
             <p className="rounded bg-gray-50 p-2 text-xs text-gray-600 leading-relaxed">{agent.systemPrompt}</p>
           </div>
 
-          {/* LLM Config */}
+          {/* LLM Provider Selector */}
           <div>
-            <h3 className="font-semibold text-gray-700 mb-1">LLM Configuration</h3>
-            <div className="rounded bg-gray-50 p-2 space-y-1">
-              {Object.entries(agent.config).map(([key, val]) => (
-                <div key={key} className="flex justify-between text-xs">
-                  <span className="text-gray-500">{key}</span>
-                  <span className="font-mono text-gray-800 text-right max-w-[60%] truncate" title={String(val)}>{String(val)}</span>
+            <h3 className="font-semibold text-gray-700 mb-2">LLM Provider</h3>
+            <div className="rounded border bg-gray-50 p-3 space-y-3">
+              {/* Provider toggle */}
+              <div className="flex gap-1">
+                {LLM_PROVIDERS.map((p) => (
+                  <button
+                    key={p.value}
+                    onClick={() => handleProviderChange(p.value)}
+                    className={`flex-1 rounded px-2 py-1.5 text-xs font-medium transition-colors ${
+                      llmProvider === p.value
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "bg-white text-gray-600 hover:bg-gray-100 border"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Model selector */}
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Model</label>
+                <select
+                  value={llmModel}
+                  onChange={(e) => handleModelChange(e.target.value)}
+                  className="w-full rounded border bg-white px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  {LLM_PROVIDERS.find(p => p.value === llmProvider)?.models.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* OpenAI API Key (only when OpenAI selected) */}
+              {llmProvider === "openai" && (
+                <div>
+                  <label className="text-xs text-gray-500 block mb-1">API Key</label>
+                  <input
+                    type="password"
+                    value={openaiKey}
+                    onChange={(e) => handleKeyChange(e.target.value)}
+                    placeholder="sk-..."
+                    className="w-full rounded border bg-white px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Stored in your browser only</p>
                 </div>
-              ))}
+              )}
+
+              {/* Active config summary */}
+              <div className="border-t pt-2 space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">provider</span>
+                  <span className="font-mono text-gray-800">{llmProvider}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">model</span>
+                  <span className="font-mono text-gray-800">{llmModel}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">endpoint</span>
+                  <span className="font-mono text-gray-800 text-right max-w-[60%] truncate" title={llmProvider === "openai" ? "https://api.openai.com/v1" : agent.config.endpoint}>
+                    {llmProvider === "openai" ? "api.openai.com" : agent.config.endpoint}
+                  </span>
+                </div>
+                {llmProvider === "openai" && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-500">apiKey</span>
+                    <span className="font-mono text-gray-800">{openaiKey ? "••••" + openaiKey.slice(-4) : "not set"}</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -374,8 +486,12 @@ export default function ChatPage() {
               <p className="text-gray-400 pl-4">&#8595; HTTP POST /agents/execute</p>
               <p className="pl-4">Agent Engine (:8053)</p>
               <p className="text-gray-400 pl-6">&#8595; LangGraph StateGraph</p>
-              <p className="pl-6">Ollama (:20434)</p>
-              <p className="text-gray-400 pl-8">&#8595; qwen2.5:1.5b</p>
+              <p className={`pl-6 ${llmProvider === "openai" ? "text-green-700 font-semibold" : ""}`}>
+                {llmProvider === "openai" ? "OpenAI API" : "Ollama (:20434)"}
+              </p>
+              <p className={`text-gray-400 pl-8 ${llmProvider === "openai" ? "text-green-600" : ""}`}>
+                &#8595; {llmModel}
+              </p>
               {agent.tools.length > 0 && (
                 <>
                   <p className="text-gray-400 pl-6">&#8595; tool calls</p>

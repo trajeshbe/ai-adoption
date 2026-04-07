@@ -77,17 +77,26 @@ async def resolve_send_message(input: SendMessageInput) -> ChatMessage:
                 "content": msg.content,
             })
 
+    # Build request payload
+    payload: dict = {
+        "agent_type": agent_type,
+        "message": input.content,
+        "history": history,
+        "session_id": str(session_id),
+    }
+    if input.llm_config and input.llm_config.provider:
+        payload["llm_config"] = {
+            "provider": input.llm_config.provider,
+            "model": input.llm_config.model,
+            "api_key": input.llm_config.api_key,
+        }
+
     # Call agent-engine
     try:
         async with httpx.AsyncClient(timeout=120.0) as client:
             resp = await client.post(
                 f"{agent_engine_url}/agents/execute",
-                json={
-                    "agent_type": agent_type,
-                    "message": input.content,
-                    "history": history,
-                    "session_id": str(session_id),
-                },
+                json=payload,
             )
             resp.raise_for_status()
             data = resp.json()

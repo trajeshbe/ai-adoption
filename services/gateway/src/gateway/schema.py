@@ -127,9 +127,19 @@ class CreateAgentInput:
 
 
 @strawberry.input
+class LLMConfigInput:
+    """Optional per-request LLM provider override."""
+
+    provider: str = ""  # "ollama" or "openai"
+    model: str = ""  # e.g. "gpt-4o-mini", "qwen2.5:1.5b"
+    api_key: str = ""  # Required for OpenAI
+
+
+@strawberry.input
 class SendMessageInput:
     """Input for sending a chat message."""
 
     agent_id: UUID
     session_id: UUID | None = None
     content: str
+    llm_config: LLMConfigInput | None = None

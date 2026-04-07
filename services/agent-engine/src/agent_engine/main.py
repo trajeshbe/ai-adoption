@@ -30,6 +30,14 @@ logger = structlog.get_logger()
 # ── Request / Response Schemas ────────────────────────────────────────
 
 
+class LLMConfig(BaseModel):
+    """Per-request LLM provider override (optional)."""
+
+    provider: str = ""  # "ollama" or "openai"
+    model: str = ""  # e.g. "gpt-4o-mini", "qwen2.5:1.5b"
+    api_key: str = ""  # Required for OpenAI
+
+
 class ExecuteRequest(BaseModel):
     """POST body for /agents/execute."""
 
@@ -37,6 +45,7 @@ class ExecuteRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=50000)
     history: list[dict[str, Any]] = Field(default_factory=list)
     session_id: str | None = None
+    llm_config: LLMConfig | None = None
 
 
 class ToolCallOut(BaseModel):
@@ -140,11 +149,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             from agent_engine.flows.agent_flow import agent_flow
 
+            llm_override = None
+            if body.llm_config and body.llm_config.provider:
+                llm_override = {
+                    "provider": body.llm_config.provider,
+                    "model": body.llm_config.model,
+                    "api_key": body.llm_config.api_key,
+                }
+
             response = await agent_flow(
                 agent_type=body.agent_type,
                 user_message=body.message,
                 history=body.history,
                 settings=request.app.state.settings,
+                llm_override=llm_override,
             )
 
             return ExecuteResponse(
