@@ -1,23 +1,270 @@
 # How This Platform Was Built with Claude Code
 
 A comprehensive guide for fresh graduates on AI-assisted software development.
+Covers installation, configuration, and a developer roadmap from first install to
+production deployment -- with real examples from this AI Agent Platform.
 
 ---
 
 ## Table of Contents
 
-1. [What is Claude Code?](#1-what-is-claude-code)
-2. [CLAUDE.md -- The Project Brain](#2-claudemd----the-project-brain)
-3. [Slash Commands -- Tutorial Phases](#3-slash-commands----tutorial-phases)
-4. [How This App Was Built with Claude Code](#4-how-this-app-was-built-with-claude-code)
-5. [The AI-Assisted Development Workflow](#5-the-ai-assisted-development-workflow)
-6. [Architecture Decision Records (ADRs)](#6-architecture-decision-records-adrs)
-7. [Best Practices for AI-Assisted Development](#7-best-practices-for-ai-assisted-development)
-8. [What Claude Code Can and Cannot Do](#8-what-claude-code-can-and-cannot-do)
+**Part I: Getting Started with Claude Code**
+
+1. [Developer Roadmap](#1-developer-roadmap)
+2. [Installation & Setup](#2-installation--setup)
+3. [What is Claude Code?](#3-what-is-claude-code)
+4. [Available Platforms](#4-available-platforms)
+5. [Keyboard Shortcuts & CLI Reference](#5-keyboard-shortcuts--cli-reference)
+
+**Part II: Configuration & Customization**
+
+6. [CLAUDE.md -- The Project Brain](#6-claudemd----the-project-brain)
+7. [Auto Memory](#7-auto-memory)
+8. [Rules System](#8-rules-system)
+9. [Settings & Configuration](#9-settings--configuration)
+
+**Part III: Skills, Hooks & Extensions**
+
+10. [Custom Skills System](#10-custom-skills-system)
+11. [Slash Commands -- Tutorial Phases](#11-slash-commands----tutorial-phases)
+12. [Hooks -- Automation](#12-hooks----automation)
+13. [MCP Servers -- External Data](#13-mcp-servers----external-data)
+14. [Subagents & Multi-Session Workflows](#14-subagents--multi-session-workflows)
+
+**Part IV: Building with Claude Code (This Project)**
+
+15. [How This App Was Built with Claude Code](#15-how-this-app-was-built-with-claude-code)
+16. [The AI-Assisted Development Workflow](#16-the-ai-assisted-development-workflow)
+17. [Architecture Decision Records (ADRs)](#17-architecture-decision-records-adrs)
+
+**Part V: Production & Best Practices**
+
+18. [CI/CD Integration](#18-cicd-integration)
+19. [Best Practices for AI-Assisted Development](#19-best-practices-for-ai-assisted-development)
+20. [What Claude Code Can and Cannot Do](#20-what-claude-code-can-and-cannot-do)
 
 ---
 
-## 1. What is Claude Code?
+## 1. Developer Roadmap
+
+A structured learning path from first install to production deployment. Each stage
+builds on the previous one.
+
+```
+Stage 1: INSTALL & EXPLORE (Day 1)
+  │  Install Claude Code, learn the CLI, explore a codebase
+  │
+Stage 2: CONFIGURE (Day 1-2)
+  │  Write CLAUDE.md, set up rules, configure settings
+  │
+Stage 3: DEVELOP (Day 2-7)
+  │  Build features, debug errors, refactor code
+  │  Use skills, slash commands, and subagents
+  │
+Stage 4: TEST (Day 7-10)
+  │  Generate unit/integration/e2e tests
+  │  Run load tests, fix failures with Claude Code
+  │
+Stage 5: DEPLOY (Day 10-14)
+  │  CI/CD integration, Kubernetes manifests, GitOps
+  │  Domain setup, HTTPS, monitoring
+  │
+Stage 6: SCALE & AUTOMATE (Ongoing)
+     Hooks, MCP servers, custom skills, team workflows
+     Multi-agent orchestration, scheduled tasks
+```
+
+### Stage 1: Install & Explore
+
+**Goal:** Get Claude Code running and comfortable navigating a codebase.
+
+```bash
+# Install Claude Code
+npm install -g @anthropic-ai/claude-code
+
+# Navigate to any project
+cd ~/my-project
+
+# Start Claude Code
+claude
+
+# Try these first commands:
+#   "What does this project do?"
+#   "Show me the main entry point"
+#   "What dependencies does this project use?"
+#   "Explain the architecture"
+```
+
+At this stage, use Claude Code as an **intelligent code reader**. Ask questions,
+explore files, understand how things connect. Don't write code yet -- build your
+mental model first.
+
+### Stage 2: Configure
+
+**Goal:** Set up CLAUDE.md and project-specific configuration so Claude Code
+generates code that fits your project's patterns.
+
+```bash
+# Auto-generate an initial CLAUDE.md
+claude /init
+
+# Review and refine the generated file
+# Add: conventions, build commands, testing strategy, architecture overview
+```
+
+Key files to create:
+- `CLAUDE.md` -- Project overview and conventions (see [Section 6](#6-claudemd----the-project-brain))
+- `.claude/settings.json` -- Permission rules and model preferences
+- `.claude/rules/` -- Modular instructions for specific file types
+
+### Stage 3: Develop
+
+**Goal:** Build features using AI pair programming. This is the core workflow.
+
+```bash
+# Describe what you want
+claude "Create a new API endpoint that returns user analytics grouped by date"
+
+# Debug an error
+claude "Here's the error: [paste traceback]. Fix it."
+
+# Refactor
+claude "Convert the callback-based auth middleware to async/await"
+
+# Use a slash command for guided builds
+claude /01-scaffold-api
+```
+
+At this stage, read [Section 16](#16-the-ai-assisted-development-workflow) for the
+full development workflow with examples from this project.
+
+### Stage 4: Test
+
+**Goal:** Generate comprehensive tests and verify AI-generated code works correctly.
+
+```bash
+# Generate unit tests
+claude "Write unit tests for the user analytics endpoint"
+
+# Generate integration tests
+claude "Write integration tests for the database layer using testcontainers"
+
+# Fix failing tests
+claude "These tests fail: [paste output]. Fix the implementation."
+
+# Generate load tests
+claude "Create a load test script that simulates 30 concurrent users"
+```
+
+This project demonstrates all testing layers -- see the load test at
+`tests/load/loadtest_gpu_30users.py` and results in
+`docs/testing/load-test-gcp-gpu-30-users.md`.
+
+### Stage 5: Deploy
+
+**Goal:** Use Claude Code to generate infrastructure code and deploy to production.
+
+```bash
+# Generate Kubernetes manifests
+claude "Create Kustomize manifests for the gateway service with HPA auto-scaling"
+
+# Generate Docker Compose for staging
+claude "Add a Caddy reverse proxy to docker-compose.yml for HTTPS"
+
+# Generate CI/CD pipeline
+claude "Create a GitHub Actions workflow that builds, tests, and deploys on push to main"
+
+# Set up domain and HTTPS
+claude "Configure Caddy to serve ai-adoption.uk with automatic Let's Encrypt certificates"
+```
+
+This project's deployment journey is documented in:
+- `docs/runbooks/domain-setup.md` -- Domain + HTTPS configuration
+- `docs/runbooks/gcp-vm-operations.md` -- VM operations
+- `docs/testing/gcp-gpu-setup-scaling-testing.md` -- GPU VM + scaling demo
+
+### Stage 6: Scale & Automate
+
+**Goal:** Advanced workflows for teams and production systems.
+
+- **Hooks**: Automate quality gates (block commits without tests, enforce linting)
+- **MCP Servers**: Connect to Jira, Slack, databases for live context
+- **Custom Skills**: Package repeatable workflows (`/deploy-staging`, `/hotfix`)
+- **Subagents**: Parallelize large refactors across the codebase
+- **Scheduled Tasks**: Automated code reviews, dependency updates, monitoring
+
+Each of these features is covered in detail in the sections below.
+
+---
+
+## 2. Installation & Setup
+
+### System Requirements
+
+- **Node.js 18+** (for npm install)
+- **Operating System**: macOS, Linux, or Windows (WSL recommended)
+- **Anthropic account**: Sign up at https://console.anthropic.com
+
+### Install Claude Code
+
+```bash
+# Option 1: npm (recommended)
+npm install -g @anthropic-ai/claude-code
+
+# Option 2: Homebrew (macOS/Linux)
+brew install claude-code
+
+# Option 3: WinGet (Windows)
+winget install Anthropic.ClaudeCode
+```
+
+### First Run
+
+```bash
+# Navigate to your project
+cd ~/my-project
+
+# Start Claude Code (will prompt for authentication on first run)
+claude
+
+# Or run a one-shot command
+claude "What does this project do?"
+
+# Or pipe input
+cat error.log | claude -p "What went wrong?"
+```
+
+### Authentication
+
+On first run, Claude Code opens a browser for authentication. You can authenticate
+using:
+
+- **Claude account** (claude.ai)
+- **Anthropic Console** (console.anthropic.com)
+- **Third-party providers**: Amazon Bedrock, Google Vertex AI, Microsoft Foundry
+
+```bash
+# Switch accounts
+/login
+
+# Check current account
+/config
+```
+
+### Auto-Updates
+
+Native installs (npm) auto-update automatically. Package manager installs (Homebrew,
+WinGet) require manual updates:
+
+```bash
+# npm: auto-updates by default
+# Homebrew: brew upgrade claude-code
+# WinGet: winget upgrade Anthropic.ClaudeCode
+```
+
+---
+
+## 3. What is Claude Code?
 
 ### The Tool
 
@@ -70,7 +317,105 @@ abstraction level again so you can think about architecture instead of syntax.
 
 ---
 
-## 2. CLAUDE.md -- The Project Brain
+## 4. Available Platforms
+
+Claude Code runs on multiple platforms. Choose the one that fits your workflow.
+
+| Platform | Best For | Key Features |
+|----------|----------|-------------|
+| **Terminal CLI** | Full-featured development | Piping, scripting, one-shot commands, background agents |
+| **VS Code Extension** | Integrated IDE workflow | Inline diffs, @-mentions, plan review, conversation history |
+| **JetBrains IDEs** | IntelliJ/PyCharm/WebStorm users | Interactive diff viewing, selection context sharing |
+| **Desktop App** | Standalone sessions | Visual diff review, parallel sessions, scheduling |
+| **Web Interface** (claude.ai/code) | Async/remote work | Run on cloud infrastructure, continues when offline |
+| **Chrome Extension** (beta) | Web app testing | Connect to browser for testing and automation |
+| **Mobile** (Claude iOS app) | On-the-go monitoring | Web access, remote control of sessions |
+
+### Terminal CLI (Primary)
+
+The CLI is the most powerful interface. It supports:
+
+```bash
+# Interactive mode (REPL)
+claude
+
+# One-shot command
+claude "add error handling to the auth middleware"
+
+# Piping (stdin → Claude → stdout)
+git diff | claude -p "review this diff for security issues"
+cat error.log | claude -p "what went wrong?"
+
+# Continue last conversation
+claude -c
+
+# Resume a specific session
+/resume
+```
+
+### VS Code Extension
+
+Install from the VS Code marketplace. Key features:
+
+- **Inline diffs**: See changes as colored diffs in the editor before accepting
+- **@-mentions**: Reference files, symbols, or selections with `@filename`
+- **Plan review**: Review Claude's implementation plan before execution
+- **Conversation history**: Browse and resume past sessions
+
+### IDE Integrations (JetBrains)
+
+Available for IntelliJ IDEA, PyCharm, WebStorm, and other JetBrains IDEs:
+
+- Interactive diff viewing with accept/reject per change
+- Share selected code as context
+- Keyboard shortcuts integrated with IDE keymap
+
+---
+
+## 5. Keyboard Shortcuts & CLI Reference
+
+### Keyboard Shortcuts
+
+Press `?` in the Claude Code REPL to see all shortcuts.
+
+| Shortcut | Action |
+|----------|--------|
+| `?` | Show all shortcuts |
+| `Tab` | Autocomplete commands and file paths |
+| `↑` | Command history |
+| `Ctrl+C` | Cancel current operation |
+| `Ctrl+D` | Exit Claude Code |
+| `Escape` | Cancel current input |
+
+### Built-in Commands
+
+| Command | Description |
+|---------|-------------|
+| `/help` | Available commands and skills |
+| `/login` | Switch accounts |
+| `/clear` | Clear conversation history |
+| `/memory` | View and manage CLAUDE.md and auto memory |
+| `/config` | Open settings interface |
+| `/compact` | Summarize conversation (free up context window) |
+| `/init` | Auto-generate CLAUDE.md for your project |
+| `/resume` | Continue previous conversation |
+| `/schedule` | Create scheduled tasks |
+| `/desktop` | Hand off to desktop app |
+| `/fast` | Toggle fast output mode (same model, faster) |
+
+### CLI Flags
+
+```bash
+claude "task"              # One-shot command
+claude -p "task"           # Print mode (for piping, no interactive UI)
+claude -c                  # Continue last conversation
+claude --model opus        # Use specific model
+claude --output-format json  # JSON output for scripting
+```
+
+---
+
+## 6. CLAUDE.md -- The Project Brain
 
 ### What is CLAUDE.md?
 
@@ -172,7 +517,253 @@ prose.
 
 ---
 
-## 3. Slash Commands -- Tutorial Phases
+## 7. Auto Memory
+
+### What Is Auto Memory?
+
+Claude Code writes its own notes automatically during conversations. These notes
+persist across sessions and help Claude remember what it learned about your project.
+
+Auto memory is **enabled by default**. You do not need to configure it.
+
+### How It Works
+
+```
+~/.claude/projects/<project-hash>/memory/
+├── MEMORY.md          # Index file (loaded at session start, max 200 lines)
+├── user_role.md       # Notes about you (role, preferences)
+├── feedback_*.md      # Corrections and confirmed approaches
+├── project_*.md       # Ongoing work, goals, decisions
+└── reference_*.md     # Pointers to external systems
+```
+
+- **MEMORY.md** is the index. First 200 lines (or 25KB) are loaded at session start.
+- Each memory file has YAML frontmatter with name, description, and type.
+- Memory is **machine-local** -- it does not sync across devices or team members.
+- Claude writes memories when it learns something non-obvious about you or the project.
+
+### Types of Memories
+
+| Type | What Gets Saved | Example |
+|------|----------------|---------|
+| **user** | Your role, expertise, preferences | "Deep Go expertise, new to React frontend" |
+| **feedback** | Corrections and confirmed approaches | "Use real DB in integration tests, not mocks" |
+| **project** | Ongoing goals, decisions, deadlines | "Merge freeze starts 2026-03-05 for mobile release" |
+| **reference** | Pointers to external systems | "Pipeline bugs tracked in Linear project INGEST" |
+
+### Managing Memory
+
+```bash
+# View what Claude remembers
+/memory
+
+# Ask Claude to remember something
+"Remember that we use Redis Stack, not managed Redis, because no cloud provider supports RediSearch modules"
+
+# Ask Claude to forget something
+"Forget the note about the deployment freeze"
+```
+
+### Auto Memory vs CLAUDE.md
+
+| | CLAUDE.md | Auto Memory |
+|---|-----------|------------|
+| **Who writes it** | You | Claude |
+| **What it contains** | Instructions and conventions | Learnings and observations |
+| **Shared via git** | Yes | No (machine-local) |
+| **When to use** | Patterns you want enforced | Context Claude should remember |
+
+---
+
+## 8. Rules System
+
+### What Are Rules?
+
+Rules are modular instruction files in `.claude/rules/` that organize project
+guidance into focused, path-specific files. They are an alternative to putting
+everything in CLAUDE.md.
+
+### Directory Structure
+
+```
+.claude/rules/
+├── python.md          # Rules for all Python files
+├── frontend.md        # Rules for frontend code
+├── kubernetes.md      # Rules for K8s manifests
+└── security.md        # Security-sensitive code rules
+```
+
+### Path-Specific Rules
+
+Use YAML frontmatter to scope rules to specific file patterns:
+
+```markdown
+---
+paths: ["services/**/*.py"]
+---
+
+# Python Service Rules
+- Use the app factory pattern for all FastAPI services
+- All services must expose /healthz and /readyz endpoints
+- Use Pydantic Settings for configuration (12-factor)
+- Use structlog for structured logging
+```
+
+When you open or edit a file matching `services/**/*.py`, these rules are
+automatically loaded. Rules for unrelated files are **not loaded**, keeping
+context focused.
+
+### User-Level Rules
+
+Personal rules that apply across all projects:
+
+```
+~/.claude/rules/
+├── style.md           # Your personal coding style preferences
+└── workflow.md        # Your preferred workflow (e.g., "always run tests after changes")
+```
+
+### Rules vs CLAUDE.md
+
+| | CLAUDE.md | Rules |
+|---|-----------|-------|
+| **Loaded** | Always (every conversation) | Only when matching files are opened |
+| **Scope** | Entire project | Specific file patterns |
+| **Best for** | Architecture, conventions, commands | File-type-specific patterns |
+| **Size** | Keep under 200 lines | As detailed as needed per topic |
+
+---
+
+## 9. Settings & Configuration
+
+### Settings Hierarchy
+
+Settings are loaded in priority order (higher overrides lower):
+
+```
+Managed (IT/org policy)     ← Cannot be overridden
+  └── User (~/.claude/settings.json)
+      └── Project (.claude/settings.json)  ← Shared via git
+          └── Local (.claude/settings.local.json)  ← Gitignored
+```
+
+### Key Settings
+
+```json
+// .claude/settings.json (project-level, committed to git)
+{
+  "permissions": {
+    "allow": [
+      "Bash(make *)",
+      "Bash(uv run *)",
+      "Bash(docker compose *)",
+      "Read(*)",
+      "Write(services/**)",
+      "Edit(services/**)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(git push --force*)"
+    ]
+  }
+}
+```
+
+### Permission Modes
+
+| Mode | Behavior | When to Use |
+|------|----------|-------------|
+| **Full** | Claude can do anything without asking | Trusted environments, personal projects |
+| **Ask** (default) | Approval dialogs for risky actions | Normal development |
+| **Deny** | Specific tools/commands blocked | Team environments, security constraints |
+
+### Environment Variables
+
+```bash
+# Model selection
+CLAUDE_MODEL=claude-opus-4-6       # Use specific model
+
+# Reasoning effort
+CLAUDE_EFFORT=high                   # low, medium, high, max
+
+# Third-party providers
+ANTHROPIC_BASE_URL=...               # Custom API endpoint
+AWS_REGION=us-east-1                 # For Bedrock
+GOOGLE_CLOUD_PROJECT=...             # For Vertex AI
+```
+
+### Configure via REPL
+
+```bash
+# Open interactive settings
+/config
+
+# View current configuration
+claude --print-config
+```
+
+---
+
+## 10. Custom Skills System
+
+### What Are Skills?
+
+Skills are reusable workflows packaged as `SKILL.md` files. They go beyond simple
+slash commands by supporting arguments, tool restrictions, subagent isolation, and
+automatic invocation.
+
+### Skill Locations
+
+```
+Enterprise managed skills         ← IT-controlled, cannot be overridden
+~/.claude/skills/deploy/          ← Personal skills (all projects)
+.claude/skills/hotfix/            ← Project skills (shared via git)
+services/gateway/.claude/skills/  ← Nested skills (monorepo subdirectories)
+```
+
+### Anatomy of a Skill
+
+```markdown
+---
+name: deploy-staging
+description: Deploy the current branch to staging environment
+disable-model-invocation: true     # Only user can invoke (risky action)
+allowed-tools: ["Bash", "Read"]    # Tools Claude can use without asking
+argument-hint: "[service-name]"    # CLI autocomplete hint
+---
+
+# Deploy to Staging
+
+1. Run `make lint` and `make test` to verify the code is clean
+2. Build Docker images: `docker compose build $ARGUMENTS`
+3. Push images to registry: `docker push ...`
+4. Update the staging Kustomize overlay
+5. Trigger Argo CD sync
+```
+
+### Bundled Skills
+
+Claude Code ships with built-in skills:
+
+| Skill | What It Does |
+|-------|-------------|
+| `/batch` | Large-scale parallel changes across the codebase (uses git worktrees) |
+| `/simplify` | Review code for quality, reuse, and efficiency improvements |
+| `/debug` | Enable debug logging and troubleshoot issues |
+| `/loop` | Run a prompt repeatedly on an interval |
+| `/claude-api` | Load the Claude API reference material |
+
+### Skill Features
+
+- **Arguments**: `$ARGUMENTS` in the skill content is replaced with user input
+- **Shell injection**: `` !`git status` `` runs a shell command and injects the output
+- **Subagent isolation**: `context: fork` runs the skill in an isolated subagent
+- **Model override**: `model: haiku` for faster, cheaper skill execution
+- **Effort override**: `effort: low` for quick tasks
+
+---
+
+## 11. Slash Commands -- Tutorial Phases
 
 ### What Are Slash Commands?
 
@@ -231,7 +822,213 @@ Phase 6 adds observability. This composability means you can:
 
 ---
 
-## 4. How This App Was Built with Claude Code
+## 12. Hooks -- Automation
+
+### What Are Hooks?
+
+Hooks are automated actions that run at specific lifecycle events in Claude Code.
+They can block destructive operations, enforce standards, and integrate with
+external systems.
+
+### Hook Types
+
+| Type | What It Does | Example |
+|------|-------------|---------|
+| **Command** | Run a shell script (receives JSON via stdin) | Lint check before commit |
+| **HTTP** | POST request to an external endpoint | Notify Slack on PR creation |
+| **Prompt** | Single-turn Claude evaluation | "Does this change follow our conventions?" |
+| **Agent** | Subagent with tool access | Verify test coverage for changed files |
+
+### Key Events
+
+| Event | When It Fires | Use Case |
+|-------|--------------|----------|
+| `PreToolUse` | Before any tool runs | Block `rm -rf`, enforce file patterns |
+| `PostToolUse` | After a tool completes | Run linter after file edits |
+| `UserPromptSubmit` | When user sends a message | Add context, validate requests |
+| `SessionStart` | When a session begins | Set up dependencies, check env |
+| `Stop` | When Claude finishes a response | Run tests, validate output |
+
+### Configuration Example
+
+```json
+// .claude/settings.json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "if": "Bash(rm *)",
+        "type": "command",
+        "command": "echo 'BLOCKED: Destructive delete requires confirmation' && exit 2"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "if": "Write(services/**/*.py)",
+        "type": "command",
+        "command": "cd services && uv run ruff check --fix"
+      }
+    ]
+  }
+}
+```
+
+### Exit Codes
+
+- **0**: Success (proceed normally)
+- **2**: Blocking error (stop the operation)
+- **Other**: Non-blocking warning (log and continue)
+
+---
+
+## 13. MCP Servers -- External Data
+
+### What Is MCP?
+
+The **Model Context Protocol** (MCP) is an open standard for connecting AI tools
+to external data sources. It lets Claude Code access live data from Jira, Slack,
+Google Drive, databases, and custom APIs without you having to paste it in manually.
+
+### How It Works
+
+```
+Claude Code ──MCP──→ MCP Server ──API──→ External Service
+                     (local process)      (Jira, Slack, DB, etc.)
+```
+
+An MCP server is a small process that runs locally and exposes tools to Claude Code.
+When Claude needs data from an external service, it calls the MCP server, which
+fetches the data and returns it.
+
+### Configuration
+
+```json
+// .claude/settings.json
+{
+  "mcpServers": {
+    "jira": {
+      "command": "npx",
+      "args": ["@anthropic/mcp-server-jira"],
+      "env": {
+        "JIRA_URL": "https://company.atlassian.net",
+        "JIRA_TOKEN": "${JIRA_API_TOKEN}"
+      }
+    },
+    "postgres": {
+      "command": "npx",
+      "args": ["@anthropic/mcp-server-postgres", "postgresql://localhost/mydb"]
+    }
+  }
+}
+```
+
+### Common MCP Servers
+
+| Server | What It Provides |
+|--------|-----------------|
+| **Filesystem** | Read/write files outside the project |
+| **PostgreSQL** | Query databases directly |
+| **Slack** | Read channels, send messages |
+| **Google Drive** | Access documents and spreadsheets |
+| **GitHub** | Issues, PRs, code search |
+| **Jira** | Tickets, sprints, project data |
+
+### Use in This Project
+
+With an MCP server for PostgreSQL, Claude Code could directly query the agent
+platform's database to debug issues:
+
+```
+"What are the most recent 10 chat sessions and their token counts?"
+→ Claude calls the Postgres MCP server
+→ Runs: SELECT * FROM chat_sessions ORDER BY created_at DESC LIMIT 10
+→ Returns formatted results
+```
+
+---
+
+## 14. Subagents & Multi-Session Workflows
+
+### What Are Subagents?
+
+Subagents are independent Claude Code instances that work on subtasks in parallel.
+A lead agent delegates work to specialized subagents, then merges the results.
+
+### How Subagents Work
+
+```
+Lead Agent (main session)
+  ├── Subagent 1: "Refactor auth middleware"     ← git worktree A
+  ├── Subagent 2: "Update all unit tests"         ← git worktree B
+  └── Subagent 3: "Update documentation"          ← git worktree C
+        │
+        └── All results merged back to main session
+```
+
+### The /batch Skill
+
+The `/batch` skill orchestrates parallel agents in git worktrees for large-scale
+changes:
+
+```bash
+# Refactor all services to use the new logging format
+claude /batch "Update all Python services to use structlog instead of print statements"
+```
+
+This creates separate worktrees, runs agents in parallel, and presents the combined
+diff for review.
+
+### Custom Agents
+
+Define custom agents in `.claude/agents/`:
+
+```markdown
+# .claude/agents/reviewer.md
+---
+name: code-reviewer
+description: Reviews code changes for security and performance issues
+model: haiku
+allowed-tools: ["Read", "Grep", "Glob"]
+---
+
+Review the provided code changes for:
+1. Security vulnerabilities (OWASP Top 10)
+2. Performance issues (N+1 queries, unnecessary allocations)
+3. Error handling gaps
+4. Missing input validation
+
+Report findings as a numbered list with severity (HIGH/MEDIUM/LOW).
+```
+
+### Multi-Device Sessions
+
+Claude Code sessions can be continued across devices:
+
+```bash
+# On your laptop: start work
+claude "Begin refactoring the gateway service"
+
+# On your phone (claude.ai/code): check progress
+# Continue the session from the web interface
+
+# Back on laptop: resume
+claude -c    # Continue last conversation
+/resume      # Or pick a specific session
+```
+
+### Scheduled Tasks
+
+```bash
+# Run a code review every morning at 9 AM
+/schedule "Review all PRs opened in the last 24 hours" --cron "0 9 * * *"
+
+# Run dependency audit weekly
+/schedule "Check for security vulnerabilities in dependencies" --cron "0 0 * * 1"
+```
+
+---
+
+## 15. How This App Was Built with Claude Code
 
 This section walks through how Claude Code was actually used to build this platform.
 These are not hypothetical examples -- this is the real process.
@@ -447,7 +1244,7 @@ auto-scaling. Minikube-compatible. Load test scripts."
 
 ---
 
-## 5. The AI-Assisted Development Workflow
+## 16. The AI-Assisted Development Workflow
 
 Here is the workflow that was used to build this platform. If you adopt it, you will
 be dramatically faster than traditional development while producing code of equal or
@@ -548,7 +1345,7 @@ a vast amount of engineering knowledge.
 
 ---
 
-## 6. Architecture Decision Records (ADRs)
+## 17. Architecture Decision Records (ADRs)
 
 ### How Claude Code Helped Write ADRs
 
@@ -604,7 +1401,105 @@ time. With Claude Code, writing an ADR takes minutes instead of hours.
 
 ---
 
-## 7. Best Practices for AI-Assisted Development
+## 18. CI/CD Integration
+
+### GitHub Actions
+
+Claude Code integrates directly with GitHub Actions for automated workflows.
+
+#### Automated PR Review
+
+```yaml
+# .github/workflows/claude-review.yml
+name: Claude Code Review
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Claude Code Review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Review this PR for:
+            1. Security vulnerabilities
+            2. Performance issues
+            3. Code style violations
+            4. Missing tests
+            Post findings as PR comments.
+```
+
+#### Automated Issue Triage
+
+```yaml
+# .github/workflows/claude-triage.yml
+name: Issue Triage
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Analyze this issue and:
+            1. Add appropriate labels (bug, feature, docs, etc.)
+            2. Estimate complexity (S/M/L/XL)
+            3. Suggest which service/component is affected
+```
+
+### GitLab CI/CD
+
+Claude Code also works with GitLab pipelines:
+
+```yaml
+# .gitlab-ci.yml
+claude-review:
+  stage: review
+  script:
+    - npm install -g @anthropic-ai/claude-code
+    - claude -p "Review the changes in this merge request for quality and security"
+  only:
+    - merge_requests
+```
+
+### How This Project Uses CI/CD
+
+This project combines Claude Code with traditional CI/CD:
+
+```
+Developer pushes code
+  │
+  ├── GitHub Actions (CI)
+  │   ├── Lint (ruff + mypy + eslint)
+  │   ├── Unit tests (pytest + vitest)
+  │   ├── Security scan (Trivy + OWASP ZAP)
+  │   ├── Build Docker images
+  │   └── Push to container registry
+  │
+  ├── Argo CD (GitOps)
+  │   ├── Detects manifest changes in git
+  │   ├── Syncs to Kubernetes cluster
+  │   └── Progressive rollout with health checks
+  │
+  └── Claude Code (Review, optional)
+      ├── Automated PR review
+      ├── Suggest test improvements
+      └── Flag architectural concerns
+```
+
+---
+
+## 19. Best Practices for AI-Assisted Development
 
 These practices were learned by building this platform. They apply to any project
 using Claude Code or similar AI development tools.
@@ -689,7 +1584,7 @@ human-AI collaboration becomes more powerful.
 
 ---
 
-## 8. What Claude Code Can and Cannot Do
+## 20. What Claude Code Can and Cannot Do
 
 ### What Claude Code CAN Do
 
@@ -787,6 +1682,283 @@ about building more.
 
 ---
 
+---
+
+## 21. End-to-End Lifecycle: Development to Deployment
+
+This section walks through the **complete lifecycle** of building, testing, and
+deploying a feature using Claude Code -- from initial idea to production URL.
+Every step below was actually done in this project.
+
+### The Lifecycle at a Glance
+
+```
+1. DEVELOP ──→ 2. TEST ──→ 3. CONTAINERIZE ──→ 4. DEPLOY ──→ 5. MONITOR
+   Claude        Claude       Claude              Claude        Claude
+   writes code   writes       generates            generates     helps debug
+   & debugs      tests &      Dockerfiles &        K8s manifests production
+   errors        load tests   compose files        & CI/CD       issues
+```
+
+### Step 1: Develop a Feature with Claude Code
+
+**Real example: Adding the cost-tracker service to this platform.**
+
+```bash
+# Start Claude Code in the project root
+cd ~/kiaa/ai-adoption
+claude
+
+# Describe the feature
+> "Create a new microservice called cost-tracker that aggregates per-inference
+>  costs from the agent engine. It should expose a GraphQL endpoint for the
+>  frontend to query costs grouped by model, agent type, and time period."
+```
+
+**What Claude Code does:**
+
+1. Reads `CLAUDE.md` -- knows the app factory pattern, port conventions, Pydantic Settings
+2. Reads `services/CLAUDE.md` -- knows port 8054 is assigned to cost-tracker
+3. Scaffolds the full service:
+   ```
+   services/cost-tracker/
+   ├── src/cost_tracker/
+   │   ├── __init__.py
+   │   ├── main.py          # App factory with /healthz, /readyz
+   │   ├── config.py         # Pydantic Settings (DATABASE_URL, etc.)
+   │   ├── models.py         # SQLAlchemy models for cost records
+   │   ├── schema.py         # Strawberry GraphQL types
+   │   └── resolvers/
+   │       └── cost.py       # Query resolvers (by model, agent, time)
+   ├── tests/
+   │   └── unit/
+   │       └── test_resolvers.py
+   ├── Dockerfile
+   ├── pyproject.toml
+   └── CLAUDE.md             # Service-specific context
+   ```
+
+4. Updates `docker-compose.yml` to add the cost-tracker service
+5. Updates `services/gateway/` to forward cost queries to the new service
+
+**Debugging in real time:**
+
+```bash
+# Run the service locally
+> "Start the cost-tracker service and test the GraphQL endpoint"
+
+# Claude runs the command, gets an import error
+> ERROR: ModuleNotFoundError: No module named 'cost_tracker.config'
+
+# Claude reads the traceback, identifies the issue (missing __init__.py in src/),
+# fixes it, and re-runs -- all in the same conversation
+```
+
+### Step 2: Test with Claude Code
+
+**Unit tests:**
+
+```bash
+> "Write comprehensive unit tests for the cost-tracker resolvers"
+```
+
+Claude generates tests using pytest, following the project's test patterns:
+
+```python
+# tests/unit/test_resolvers.py
+import pytest
+from cost_tracker.main import create_app
+
+@pytest.fixture
+def client():
+    app = create_app()
+    return TestClient(app)
+
+def test_cost_by_model(client):
+    response = client.post("/graphql", json={
+        "query": "{ costByModel(days: 7) { model totalCost requestCount } }"
+    })
+    assert response.status_code == 200
+    data = response.json()["data"]["costByModel"]
+    assert isinstance(data, list)
+```
+
+**Integration tests:**
+
+```bash
+> "Write integration tests using testcontainers for the cost-tracker database layer"
+```
+
+**Load tests (real example from this project):**
+
+```bash
+> "Create a load test script that simulates 30 concurrent users hitting the
+>  chat endpoint, ramping from 5 to 30 users over 150 seconds"
+```
+
+Claude generated `tests/load/loadtest_gpu_30users.py` -- a Python asyncio load test
+that captured per-request latency, success rates, and GPU utilization at each
+concurrency level. Results: 100% success at 15 users, dropping to 34% at 30 users
+due to Ollama's serial inference bottleneck. This data directly informed the decision
+to use vLLM with continuous batching in production.
+
+**Fix failing tests:**
+
+```bash
+# Run tests
+> "Run make test and fix any failures"
+
+# Claude runs the tests, reads the output, and fixes each failure
+# Typical: 1-3 fix cycles to get all tests passing
+```
+
+### Step 3: Containerize with Claude Code
+
+```bash
+> "Create a multi-stage Dockerfile for the cost-tracker service"
+```
+
+Claude generates a Dockerfile following the project's patterns:
+
+```dockerfile
+FROM python:3.11-slim AS builder
+WORKDIR /app
+COPY pyproject.toml uv.lock ./
+RUN pip install uv && uv sync --frozen --no-dev
+
+FROM python:3.11-slim
+WORKDIR /app
+RUN useradd --create-home appuser
+COPY --from=builder /app/.venv /app/.venv
+COPY src/ ./src/
+USER appuser
+EXPOSE 8004
+CMD [".venv/bin/uvicorn", "cost_tracker.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8004"]
+```
+
+```bash
+> "Update docker-compose.yml to add the cost-tracker service"
+```
+
+Claude adds the service with correct port mapping, network, health check, and
+dependencies -- matching the patterns of existing services.
+
+### Step 4: Deploy with Claude Code
+
+**Local deployment (Docker Compose):**
+
+```bash
+> "Start all services with Docker Compose and verify health endpoints"
+
+# Claude runs:
+docker compose up -d --build
+# Then checks each service's /healthz endpoint
+```
+
+**Cloud deployment (GCP VM -- actual example from this project):**
+
+```bash
+> "Create a script to deploy the application on a GCP VM with Docker Compose
+>  and Caddy for HTTPS"
+```
+
+Claude generated:
+- `scripts/gcp-vm-start.sh` -- Starts VMs, deploys services, verifies health
+- `scripts/gcp-vm-stop.sh` -- Stops services and VMs gracefully
+- `scripts/gcp-vm-status.sh` -- Shows VM status, service health, GPU info
+- `Caddyfile` -- Reverse proxy configuration for automatic HTTPS
+
+**Domain and HTTPS setup (actual example):**
+
+```bash
+> "Configure Caddy to serve ai-adoption.uk with automatic Let's Encrypt
+>  certificates behind Cloudflare proxy"
+```
+
+Claude helped configure:
+1. Cloudflare DNS (A records pointing to VM IP)
+2. Cloudflare SSL mode (Full -- not Flexible, which causes redirect loops)
+3. Caddyfile (`:80` behind Cloudflare, not `{domain}` which causes ACME failures)
+4. Docker Compose (caddy service with `--profile web`)
+5. Environment variables (`SITE_DOMAIN`, `NEXT_PUBLIC_GRAPHQL_URL`)
+
+Result: `https://ai-adoption.uk` serves the platform with dual-layer TLS
+(Cloudflare edge + Let's Encrypt origin).
+
+**Kubernetes deployment:**
+
+```bash
+> "Create Kustomize manifests for all services with HPA auto-scaling"
+```
+
+Claude generated the full K8s stack:
+- Deployments, Services, ConfigMaps for every service
+- HPA configurations (1-5 replicas, 50% CPU target)
+- Kustomize overlays for dev/staging/prod
+- Load test scripts to demonstrate auto-scaling
+
+The auto-scaling was tested on a GCP GPU VM with minikube, demonstrating the full
+HPA lifecycle: baseline → load spike → scale-up (1→2 pods) → load drop →
+scale-down (2→1 pods). See `docs/architecture/autoscaling-deep-dive.md`.
+
+### Step 5: Monitor and Debug Production Issues with Claude Code
+
+```bash
+# Check production logs
+ssh merit@34.121.112.167 "docker logs aiadopt-gateway --tail 50"
+
+# Paste logs to Claude Code
+> "Here are the gateway logs. Why are some requests returning 502?"
+```
+
+Claude reads the logs, correlates timestamps, identifies the root cause (e.g.,
+agent-engine OOM, Prefect timeout, Ollama serial queue), and suggests fixes.
+
+**Real debugging examples from this project:**
+
+| Issue | How Claude Code Fixed It |
+|-------|-------------------------|
+| Prefect ephemeral server timeout | Added `_direct_execute()` fallback bypassing Prefect |
+| Frontend "Failed to fetch" errors | Identified wrong `NEXT_PUBLIC_GRAPHQL_URL` (build-time variable) |
+| Caddy ACME cert failure behind Cloudflare | Changed Caddyfile from `{$SITE_DOMAIN}` to `:80` |
+| Scaling dashboard empty | Connected gateway to minikube Docker network |
+| HPA not triggering | Lowered resource requests from 100m to 30m CPU |
+| `.env` file corrupted by Terraform | Diagnosed shell script leaking into .env, rewrote manually |
+
+### The Complete Flow: One Feature, End to End
+
+```
+1. "Create a cost-tracker service"
+   └── Claude scaffolds: main.py, schema.py, resolvers, Dockerfile, tests, CLAUDE.md
+
+2. "Run the tests and fix failures"
+   └── Claude runs pytest, reads errors, fixes 3 issues in 2 cycles
+
+3. "Build the Docker image and add to compose"
+   └── Claude writes Dockerfile, updates docker-compose.yml
+
+4. "Deploy to the GCP VM"
+   └── Claude SSH's guidance: git pull, docker compose up -d --build
+
+5. "The /costs page shows 'Failed to fetch'"
+   └── Claude: "Gateway needs a route to cost-tracker. Adding /costs* → cost-tracker:8004"
+
+6. "Run a load test with 20 users"
+   └── Claude generates load test, runs it, reports: "P95 latency 2.3s, 0 errors"
+
+7. "Create K8s manifests with HPA"
+   └── Claude: Deployment + Service + HPA + Kustomize overlay
+
+8. "Set up monitoring alerts"
+   └── Claude: Prometheus alert rules for error rate > 5%, latency P99 > 10s
+```
+
+Every step in this lifecycle was done in this project using Claude Code. The key
+insight: Claude Code is not just a code generator. It is a development partner that
+participates in every phase -- from initial design to production debugging.
+
+---
+
 ## Appendix: Project File Reference
 
 | Path | Description |
@@ -806,5 +1978,13 @@ about building more.
 | `infra/tekton/` | Tekton CI/CD pipelines |
 | `infra/policy/` | OPA Gatekeeper constraints |
 | `docs/architecture/adr/` | 7 Architecture Decision Records |
+| `docs/architecture/autoscaling-deep-dive.md` | HPA control loop, metrics pipeline, scaling algorithm |
 | `docs/tutorial/` | Phase 0-10 tutorial documents |
+| `docs/runbooks/domain-setup.md` | Domain + HTTPS setup (Cloudflare + Caddy) |
+| `docs/runbooks/gcp-vm-operations.md` | VM start/stop, service management, troubleshooting |
+| `docs/testing/` | Load test scripts and results |
+| `scripts/gcp-vm-start.sh` | Start GCP VMs and deploy services |
+| `scripts/gcp-vm-stop.sh` | Stop VMs and services gracefully |
+| `scripts/gcp-vm-status.sh` | Check VM and service status |
 | `tests/` | e2e, integration, load, chaos, security tests |
+| `Caddyfile` | Caddy reverse proxy configuration for HTTPS |
