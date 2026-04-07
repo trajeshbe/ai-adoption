@@ -4,9 +4,9 @@
 # Deploy the entire platform with: docker compose up -d
 # Works on: GCP Compute Engine, Azure VM, AWS EC2, any Linux with Docker
 #
-# For GPU (Ollama): Requires NVIDIA Container Toolkit installed on host
-#   GCP: Use N1/A2 instances with NVIDIA T4/A100
-#   Azure: Use NC-series VMs (NC6s_v3 for T4, NC24ads_A100)
+# GPU support (Ollama): Auto-detected by deploy pipeline
+#   For manual GPU: docker compose -f docker-compose.yml -f docker-compose.gpu.yml --profile web up -d
+#   Requires NVIDIA Container Toolkit on host (GCP N1/A2, Azure NC-series)
 #
 # Port Map:
 #   Frontend:     8055 -> 3000  (Web UI)
@@ -25,11 +25,11 @@
 # Profiles:
 #   --profile web  Adds Caddy reverse proxy with auto-HTTPS
 #
-# Cloud deploy (CPU + HTTPS):
-#   1. Set in .env:  SITE_DOMAIN=app.example.com
-#                    NEXT_PUBLIC_GRAPHQL_URL=https://app.example.com/graphql
-#   2. The Terraform startup script auto-strips GPU config on CPU-only VMs
-#   3. docker compose --profile web up -d --build
+# Cloud deploy:
+#   1. Set in .env:  SITE_DOMAIN=ai-adoption.uk
+#                    NEXT_PUBLIC_GRAPHQL_URL=https://ai-adoption.uk/graphql
+#   2. CPU: docker compose --profile web up -d --build
+#   3. GPU: docker compose -f docker-compose.yml -f docker-compose.gpu.yml --profile web up -d --build
 # ============================================================================
 
 services:
@@ -90,8 +90,9 @@ services:
     networks:
       - app-net
 
-  # Ollama LLM inference (GPU by default for local dev)
-  # Cloud/CPU-only VMs: the Terraform startup script strips the deploy block
+  # Ollama LLM inference (CPU by default)
+  # For GPU: docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+  # The deploy script auto-detects GPU and adds the override automatically
   ollama:
     container_name: aiadopt-ollama
     image: ollama/ollama:0.11.0
@@ -100,13 +101,6 @@ services:
       - "${OLLAMA_PORT:-11434}:11434"
     volumes:
       - ollama-models:/root/.ollama
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
     networks:
       - app-net
 

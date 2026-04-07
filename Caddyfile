@@ -9,9 +9,10 @@
 # For local/IP-only access (no TLS):
 #   Set SITE_DOMAIN=:80 to disable HTTPS
 
-# When behind Cloudflare proxy, serve HTTP only (Cloudflare handles TLS)
-# For direct TLS (no Cloudflare), use: {$SITE_DOMAIN:localhost}
-:80 {
+# Uses SITE_DOMAIN env var from docker-compose.yml (default: localhost)
+# For production with Cloudflare: SITE_DOMAIN=ai-adoption.uk (Caddy serves HTTPS, Cloudflare Full SSL)
+# For local dev: SITE_DOMAIN=:80 or leave as default
+{$SITE_DOMAIN:localhost} {
 	# GraphQL API + health/metrics endpoints
 	handle /graphql* {
 		reverse_proxy gateway:8000

@@ -75,10 +75,22 @@ jobs:
             git fetch origin master
             git reset --hard origin/master
 
+            # Detect GPU availability and set compose command
+            echo ""
+            echo "── Detecting GPU ──"
+            COMPOSE_CMD="docker compose -f docker-compose.yml"
+            if command -v nvidia-smi &>/dev/null && nvidia-smi &>/dev/null; then
+              echo "  GPU detected -- using GPU override"
+              COMPOSE_CMD="$COMPOSE_CMD -f docker-compose.gpu.yml"
+            else
+              echo "  No GPU detected -- running CPU-only"
+            fi
+            COMPOSE_CMD="$COMPOSE_CMD --profile web"
+
             # Rebuild and restart services
             echo ""
             echo "── Rebuilding services ──"
-            docker compose --profile web up -d --build 2>&1 | tail -20
+            $COMPOSE_CMD up -d --build 2>&1 | tail -20
 
             # Wait for services to stabilize
             echo ""
@@ -115,7 +127,7 @@ jobs:
               echo "── ROLLBACK: Health checks failed ──"
               echo "Rolling back to $PREV_COMMIT"
               git reset --hard "$PREV_COMMIT"
-              docker compose --profile web up -d --build 2>&1 | tail -10
+              $COMPOSE_CMD up -d --build 2>&1 | tail -10
               exit 1
             fi
 
