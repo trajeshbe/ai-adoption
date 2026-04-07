@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # ── Stage 1: CI Gate ──────────────────────────────────────────────
+  # ── Stage 1: CI Gate (reuse CI workflow) ─────────────────────────
   ci:
     name: CI Gate
     uses: ./.github/workflows/ci.yml
@@ -26,7 +26,7 @@ jobs:
     name: UAT Approval
     needs: [ci]
     runs-on: ubuntu-latest
-    if: ${{ !inputs.skip_uat }}
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_uat) }}
     environment: production
     steps:
       - name: Approval confirmed
@@ -41,8 +41,11 @@ jobs:
   # ── Stage 3: Deploy to GCP VM ────────────────────────────────────
   deploy:
     name: Deploy to Production
-    needs: [uat-approval]
-    if: ${{ always() && (needs.uat-approval.result == 'success' || inputs.skip_uat) && needs.ci.result == 'success' }}
+    needs: [ci, uat-approval]
+    if: |
+      always() &&
+      needs.ci.result == 'success' &&
+      (needs.uat-approval.result == 'success' || needs.uat-approval.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - name: Deploy via SSH
@@ -92,9 +95,9 @@ jobs:
               port="${svc##*:}"
               status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "http://localhost:${port}/healthz" 2>/dev/null || echo "000")
               if [ "$status" = "200" ]; then
-                echo "  ✓ $name (:$port) - healthy"
+                echo "  OK: $name (:$port) - healthy"
               else
-                echo "  ✗ $name (:$port) - HTTP $status"
+                echo "  FAIL: $name (:$port) - HTTP $status"
                 FAILED=1
               fi
             done
@@ -102,9 +105,9 @@ jobs:
             # Check frontend
             fstatus=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "http://localhost:8055/" 2>/dev/null || echo "000")
             if [ "$fstatus" = "200" ]; then
-              echo "  ✓ frontend (:8055) - healthy"
+              echo "  OK: frontend (:8055) - healthy"
             else
-              echo "  ✗ frontend (:8055) - HTTP $fstatus"
+              echo "  FAIL: frontend (:8055) - HTTP $fstatus"
               FAILED=1
             fi
 
