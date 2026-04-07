@@ -1,0 +1,21 @@
+name: Sync Repos
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  sync-to-merit:
+    name: Sync to merit-data-tech
+    runs-on: ubuntu-latest
+    if: github.repository == 'trajeshbe/ai-adoption'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to merit-data-tech/ai-adoption
+        run: |
+          git remote add merit https://x-access-token:${{ secrets.MERIT_REPO_TOKEN }}@github.com/merit-data-tech/ai-adoption.git
+          git push merit master
+          echo "Synced to merit-data-tech/ai-adoption"

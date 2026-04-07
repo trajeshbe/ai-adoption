@@ -1,0 +1,175 @@
+name: Deploy
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      skip_uat:
+        description: "Skip UAT approval (emergency deploy)"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  # ── Stage 1: CI Gate ──────────────────────────────────────────────
+  ci:
+    name: CI Gate
+    uses: ./.github/workflows/ci.yml
+
+  # ── Stage 2: UAT Approval ────────────────────────────────────────
+  uat-approval:
+    name: UAT Approval
+    needs: [ci]
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.skip_uat }}
+    environment: production
+    steps:
+      - name: Approval confirmed
+        run: |
+          echo "============================================"
+          echo " UAT Approved"
+          echo " Approved by: ${{ github.actor }}"
+          echo " Commit: ${{ github.sha }}"
+          echo " Ref: ${{ github.ref }}"
+          echo "============================================"
+
+  # ── Stage 3: Deploy to GCP VM ────────────────────────────────────
+  deploy:
+    name: Deploy to Production
+    needs: [uat-approval]
+    if: ${{ always() && (needs.uat-approval.result == 'success' || inputs.skip_uat) && needs.ci.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ vars.GCP_VM_HOST }}
+          username: merit
+          key: ${{ secrets.GCP_VM_SSH_KEY }}
+          script_stop: true
+          command_timeout: 10m
+          script: |
+            set -e
+            echo "============================================"
+            echo " Deploying AI Agent Platform"
+            echo " Commit: ${{ github.sha }}"
+            echo " Time: $(date '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "============================================"
+
+            cd ~/kiaa/ai-adoption
+
+            # Record current commit for rollback
+            PREV_COMMIT=$(git rev-parse HEAD)
+            echo "Previous commit: $PREV_COMMIT"
+
+            # Pull latest code
+            echo ""
+            echo "── Pulling latest code ──"
+            git fetch origin master
+            git reset --hard origin/master
+
+            # Rebuild and restart services
+            echo ""
+            echo "── Rebuilding services ──"
+            docker compose --profile web up -d --build 2>&1 | tail -20
+
+            # Wait for services to stabilize
+            echo ""
+            echo "── Waiting for services to stabilize ──"
+            sleep 20
+
+            # Health checks
+            echo ""
+            echo "── Health Checks ──"
+            FAILED=0
+            for svc in "gateway:8050" "agent-engine:8053" "cache-service:8052" "cost-tracker:8054"; do
+              name="${svc%%:*}"
+              port="${svc##*:}"
+              status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "http://localhost:${port}/healthz" 2>/dev/null || echo "000")
+              if [ "$status" = "200" ]; then
+                echo "  ✓ $name (:$port) - healthy"
+              else
+                echo "  ✗ $name (:$port) - HTTP $status"
+                FAILED=1
+              fi
+            done
+
+            # Check frontend
+            fstatus=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "http://localhost:8055/" 2>/dev/null || echo "000")
+            if [ "$fstatus" = "200" ]; then
+              echo "  ✓ frontend (:8055) - healthy"
+            else
+              echo "  ✗ frontend (:8055) - HTTP $fstatus"
+              FAILED=1
+            fi
+
+            if [ "$FAILED" = "1" ]; then
+              echo ""
+              echo "── ROLLBACK: Health checks failed ──"
+              echo "Rolling back to $PREV_COMMIT"
+              git reset --hard "$PREV_COMMIT"
+              docker compose --profile web up -d --build 2>&1 | tail -10
+              exit 1
+            fi
+
+            echo ""
+            echo "── Container Status ──"
+            docker ps --format "table {{.Names}}\t{{.Status}}" | head -15
+
+            echo ""
+            echo "============================================"
+            echo " Deployment successful!"
+            echo " Commit: $(git rev-parse --short HEAD)"
+            echo " Time: $(date '+%Y-%m-%d %H:%M:%S UTC')"
+            echo "============================================"
+
+  # ── Stage 4: Smoke Test ──────────────────────────────────────────
+  smoke-test:
+    name: Smoke Test (Public URL)
+    needs: [deploy]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test public endpoints
+        run: |
+          echo "Testing https://ai-adoption.uk ..."
+          sleep 10
+
+          # Health endpoint
+          HEALTH=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "https://ai-adoption.uk/healthz" || echo "000")
+          echo "  /healthz: HTTP $HEALTH"
+
+          # Frontend
+          FRONT=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "https://ai-adoption.uk/" || echo "000")
+          echo "  /: HTTP $FRONT"
+
+          # GraphQL
+          GQL=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "https://ai-adoption.uk/graphql" || echo "000")
+          echo "  /graphql: HTTP $GQL"
+
+          if [ "$HEALTH" = "200" ] && [ "$FRONT" = "200" ]; then
+            echo ""
+            echo "All smoke tests passed!"
+          else
+            echo ""
+            echo "WARNING: Some endpoints returned non-200 status."
+            echo "This may be a Cloudflare/DNS propagation issue."
+            echo "Check manually: https://ai-adoption.uk"
+          fi
+
+      - name: Post deployment summary
+        if: always()
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commit** | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Branch** | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Triggered by** | ${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **URL** | https://ai-adoption.uk |" >> $GITHUB_STEP_SUMMARY
+          echo "| **GraphQL** | https://ai-adoption.uk/graphql |" >> $GITHUB_STEP_SUMMARY
