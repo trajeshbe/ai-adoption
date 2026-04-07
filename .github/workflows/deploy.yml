@@ -54,7 +54,6 @@ jobs:
           host: ${{ vars.GCP_VM_HOST }}
           username: merit
           key: ${{ secrets.GCP_VM_SSH_KEY }}
-          script_stop: true
           command_timeout: 10m
           script: |
             set -e
