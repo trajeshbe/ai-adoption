@@ -140,6 +140,7 @@ ai-adoption/
 
 | Document | Description |
 |----------|-------------|
+| [Getting Started: Enterprise AI Adoption](docs/getting-started-enterprise-ai-adoption.md) | Complete onboarding guide with learning paths, enterprise roadmap, and all doc references |
 | [Claude Code Guide](docs/tutorial/claude-code-guide.md) | Developer roadmap: install → configure → develop → test → deploy |
 | [CI/CD Pipeline](docs/runbooks/cicd-pipeline.md) | Pipeline overview, branch strategy, deployment paths |
 | [GCP Deployment](docs/runbooks/deploy-gcp-full-guide.md) | Step-by-step GCP VM deployment |
