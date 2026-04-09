@@ -143,6 +143,7 @@ ai-adoption/
 | [Getting Started: Enterprise AI Adoption](docs/getting-started-enterprise-ai-adoption.md) | Complete onboarding guide with learning paths, enterprise roadmap, and all doc references |
 | [Claude Code Guide](docs/tutorial/claude-code-guide.md) | Developer roadmap: install → configure → develop → test → deploy |
 | [Claude Code Tips](docs/tutorial/claude-code-tips.md) | 45 practical tips from basics to advanced (context, Git, testing, research) |
+| [Cost-Benefit Analysis](docs/cost-benefit-analysis-ai-tools.md) | AI tool comparison (Claude, Copilot, Cursor, Codex) with ROI model for 125 engineers |
 | [CI/CD Pipeline](docs/runbooks/cicd-pipeline.md) | Pipeline overview, branch strategy, deployment paths |
 | [GCP Deployment](docs/runbooks/deploy-gcp-full-guide.md) | Step-by-step GCP VM deployment |
 | [Domain Setup](docs/runbooks/domain-setup.md) | Cloudflare + Caddy HTTPS configuration |
